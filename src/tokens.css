@@ -1,0 +1,1218 @@
+/* =============================================
+   LumaForge Lite — Design Tokens
+   ============================================= */
+
+:root {
+  color-scheme: dark;
+
+  /* ── Color System ─────────────────────────── */
+  --bg-base:             #070b14;
+  --bg-surface:          #0c1220;
+  --bg-elevated:         #111827;
+  --bg-overlay:          rgba(15, 23, 42, 0.85);
+
+  --surface-card:        rgba(15, 23, 42, 0.65);
+  --surface-card-hover:  rgba(15, 23, 42, 0.82);
+  --surface-input:       rgba(2, 6, 23, 0.6);
+  --surface-sidebar:     rgba(2, 6, 23, 0.92);
+
+  --border-subtle:       rgba(59, 130, 246, 0.06);
+  --border-default:      rgba(59, 130, 246, 0.10);
+  --border-strong:       rgba(59, 130, 246, 0.18);
+  --border-focus:        rgba(59, 130, 246, 0.40);
+
+  --accent:              #60a5fa;
+  --accent-muted:        rgba(59, 130, 246, 0.12);
+  --accent-strong:       rgba(59, 130, 246, 0.22);
+  --accent-glow:         rgba(59, 130, 246, 0.25);
+
+  --green:               #34d399;
+  --green-muted:         rgba(52, 211, 153, 0.12);
+  --green-glow:          rgba(52, 211, 153, 0.35);
+
+  --red:                 #f87171;
+  --red-muted:           rgba(239, 68, 68, 0.10);
+  --red-glow:            rgba(239, 68, 68, 0.30);
+
+  --yellow:              #fbbf24;
+  --yellow-muted:        rgba(245, 158, 11, 0.12);
+
+  --purple:              #a78bfa;
+  --purple-muted:        rgba(139, 92, 246, 0.12);
+
+  --orange:              #f97316;
+  --orange-muted:        rgba(249, 115, 22, 0.12);
+  --orange-glow:         rgba(249, 115, 22, 0.30);
+
+  /* ── Text ─────────────────────────────────── */
+  --text-primary:        #e2e8f0;
+  --text-secondary:      #94a3b8;
+  --text-tertiary:       #64748b;
+  --text-muted:          #475569;
+  --text-disabled:       #334155;
+
+  /* ── Typography ───────────────────────────── */
+  --font-sans:           -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Oxygen, Ubuntu, sans-serif;
+  --font-mono:           'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
+
+  --text-xs:             11px;
+  --text-sm:             12px;
+  --text-base:           13px;
+  --text-md:             14px;
+  --text-lg:             16px;
+  --text-xl:             18px;
+
+  --weight-normal:       400;
+  --weight-medium:       500;
+  --weight-semibold:     600;
+  --weight-bold:         700;
+
+  --leading-tight:       1.3;
+  --leading-normal:      1.5;
+  --leading-relaxed:     1.65;
+
+  /* ── Spacing (8px grid) ──────────────────── */
+  --sp-0:                0px;
+  --sp-1:                4px;
+  --sp-2:                8px;
+  --sp-3:                12px;
+  --sp-4:                16px;
+  --sp-5:                20px;
+  --sp-6:                24px;
+  --sp-8:                32px;
+  --sp-10:               40px;
+
+  /* ── Radii ────────────────────────────────── */
+  --radius-sm:           6px;
+  --radius-md:           8px;
+  --radius-lg:           11px;
+  --radius-xl:           14px;
+  --radius-full:         9999px;
+
+  /* ── Sidebar ──────────────────────────────── */
+  --sidebar-collapsed:   72px;
+  --sidebar-expanded:    256px;
+
+  /* ── Header ───────────────────────────────── */
+  --header-height:       52px;
+
+  /* ── Shadows ──────────────────────────────── */
+  --shadow-sm:           0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md:           0 4px 16px -2px rgba(0, 0, 0, 0.4);
+  --shadow-lg:           0 8px 32px -4px rgba(0, 0, 0, 0.5);
+  --shadow-glow-accent:  0 0 20px rgba(59, 130, 246, 0.15);
+  --shadow-glow-green:   0 0 16px rgba(52, 211, 153, 0.25);
+
+  /* ── Transitions ──────────────────────────── */
+  --ease-out:            cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out:         cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast:       120ms;
+  --duration-normal:     200ms;
+  --duration-slow:       350ms;
+  --duration-sidebar:    300ms;
+
+  /* ── App Shell ────────────────────────────── */
+  --app-shell-glow:      rgba(59, 130, 246, 0.04);
+  --app-shell-bg-1:      #020617;
+  --app-shell-bg-2:      #0a1628;
+  --app-shell-bg-3:      #0c1d3d;
+  --app-shell-bg-4:      #0f172a;
+  --app-shell-border:    rgba(59, 130, 246, 0.06);
+
+  /* ── Sidebar ──────────────────────────────── */
+  --sidebar-logo-gradient-start: #60a5fa;
+  --sidebar-logo-gradient-end:   #a78bfa;
+  --sidebar-logo-shadow:         rgba(96, 165, 250, 0.3);
+
+  /* ── Header Status ────────────────────────── */
+  --header-status-border: rgba(52, 211, 153, 0.15);
+  --header-status-dot-offline-shadow: rgba(251, 191, 36, 0.35);
+
+  /* ── Window Controls ──────────────────────── */
+  --window-btn-hover-bg: rgba(255, 255, 255, 0.06);
+
+  /* ── Toggle ───────────────────────────────── */
+  --toggle-track-bg:     rgba(148, 163, 184, 0.12);
+  --toggle-on-shadow:    0 0 6px var(--green-glow), 0 0 12px rgba(52, 211, 153, 0.2);
+
+  /* ── Buttons ──────────────────────────────── */
+  --btn-primary-hover-color: #93c5fd;
+  --btn-danger-hover-bg:     rgba(239, 68, 68, 0.18);
+  --btn-danger-hover-border: rgba(239, 68, 68, 0.3);
+  --btn-danger-hover-color:  #fca5a5;
+
+  /* ── Input Focus ──────────────────────────── */
+  --input-focus-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08);
+
+  /* ── Settings ─────────────────────────────── */
+  --settings-row-hover:       rgba(255, 255, 255, 0.015);
+  --settings-row-click-hover: rgba(255, 255, 255, 0.03);
+  --settings-status-badge-bg: rgba(148, 163, 184, 0.08);
+  --settings-status-badge-border: rgba(148, 163, 184, 0.12);
+
+  /* ── Theme Card ───────────────────────────── */
+  --theme-swatch-border: rgba(255, 255, 255, 0.1);
+
+  /* ── Surface Preview ──────────────────────── */
+  --surface-preview-solid:   rgba(15, 23, 42, 0.95);
+  --surface-preview-tinted:  linear-gradient(135deg, rgba(15, 23, 42, 0.70), rgba(59, 130, 246, 0.12));
+  --surface-preview-glass:   rgba(15, 23, 42, 0.40);
+  --surface-preview-fluent:  rgba(18, 24, 34, 0.35);
+
+  /* ── Provider Cards ───────────────────────── */
+  --provider-enabled-border: rgba(52, 211, 153, 0.2);
+  --provider-online-border:  rgba(52, 211, 153, 0.15);
+  --provider-warn-border:    rgba(250, 204, 21, 0.15);
+  --provider-cap-blue-border: rgba(59, 130, 246, 0.12);
+  --provider-cap-yellow-border: rgba(250, 204, 21, 0.12);
+  --provider-cap-gray-bg:   rgba(148, 163, 184, 0.08);
+  --provider-cap-gray-border: rgba(148, 163, 184, 0.12);
+  --provider-type-bg:       rgba(148, 163, 184, 0.06);
+  --provider-type-border:   rgba(148, 163, 184, 0.10);
+
+  /* ── Confirm Modal ────────────────────────── */
+  --confirm-backdrop-glow:    rgba(35, 103, 190, 0.12);
+  --confirm-backdrop-bg:      rgba(1, 7, 18, 0.82);
+  --confirm-bg-1:             rgba(16, 32, 59, 0.99);
+  --confirm-bg-2:             rgba(7, 17, 35, 0.99);
+  --confirm-text:             #d9e4f2;
+  --confirm-text-secondary:   #9cabc1;
+  --confirm-text-strong:      #dce8f8;
+  --confirm-close-color:      #7f8da4;
+  --confirm-close-hover-bg:   rgba(255, 255, 255, 0.07);
+  --confirm-close-hover-border: rgba(255, 255, 255, 0.08);
+  --confirm-title-color:      #ffffff;
+  --confirm-accent-rgb:       96, 165, 250;
+  --confirm-btn-primary-text: #171304;
+  --confirm-btn-secondary-text: #aab8cc;
+  --confirm-btn-secondary-bg-1: rgba(255, 255, 255, 0.055);
+  --confirm-btn-secondary-bg-2: rgba(255, 255, 255, 0.025);
+  --confirm-btn-secondary-border: rgba(255, 255, 255, 0.105);
+  --confirm-btn-secondary-hover-bg-1: rgba(255, 255, 255, 0.09);
+  --confirm-btn-secondary-hover-bg-2: rgba(255, 255, 255, 0.04);
+  --confirm-btn-secondary-hover-border: rgba(255, 255, 255, 0.18);
+  --confirm-warning-color:    #d8bb70;
+  --confirm-warning-bg:       linear-gradient(135deg, rgba(246, 193, 76, 0.085), rgba(246, 193, 76, 0.03));
+  --confirm-warning-border:   rgba(246, 193, 76, 0.17);
+  --confirm-warning-icon:     #e8be57;
+
+  /* ── Dashboard ────────────────────────────── */
+  --dashboard-bg:             #07101f;
+  --dashboard-surface:        rgba(13, 25, 46, 0.78);
+  --dashboard-surface-strong: rgba(15, 29, 53, 0.94);
+  --dashboard-border:         rgba(148, 175, 220, 0.12);
+  --dashboard-border-hover:   rgba(119, 161, 255, 0.26);
+  --dashboard-text:           #f5f8ff;
+  --dashboard-text-soft:      #b7c5dc;
+  --dashboard-text-muted:     #778aa8;
+  --dashboard-blue:           #4f8cff;
+  --dashboard-blue-light:     #79a8ff;
+  --dashboard-green:          #36d89c;
+  --dashboard-yellow:         #f8b84e;
+  --dashboard-red:            #ff647c;
+  --dashboard-orange:         #ffa340;
+
+  /* ── Dashboard Hero ───────────────────────── */
+  --dashboard-hero-bg-1:      rgba(17, 34, 62, 0.96);
+  --dashboard-hero-bg-2:      rgba(8, 18, 35, 0.98);
+  --dashboard-hero-bg-3:      rgba(5, 12, 25, 1);
+  --dashboard-hero-shadow:    0 24px 70px rgba(0, 0, 0, 0.3);
+  --dashboard-hero-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  --dashboard-hero-grid-color: rgba(255, 255, 255, 0.018);
+
+  /* ── Dashboard Power Button ───────────────── */
+  --power-btn-border:         rgba(149, 187, 255, 0.55);
+  --power-btn-bg-1:           #5c96ff;
+  --power-btn-bg-2:           #3d79ed;
+  --power-btn-bg-3:           #2a5fc8;
+  --power-btn-shadow-color:   rgba(36, 99, 215, 0.36);
+  --power-btn-glow-color:     rgba(79, 140, 255, 0.2);
+  --power-btn-inset-dark:     rgba(7, 25, 62, 0.32);
+  --power-btn-highlight:      rgba(255, 255, 255, 0.22);
+  --power-btn-inner-border:   rgba(255, 255, 255, 0.13);
+  --power-btn-gloss:          rgba(255, 255, 255, 0.24);
+
+  /* ── Dashboard Power Button: Enabled ──────── */
+  --power-btn-enabled-border: rgba(144, 255, 215, 0.62);
+  --power-btn-enabled-bg-1:   #42dda5;
+  --power-btn-enabled-bg-2:   #23b981;
+  --power-btn-enabled-bg-3:   #148761;
+  --power-btn-enabled-shadow: rgba(24, 169, 114, 0.3);
+  --power-btn-enabled-glow:   rgba(54, 216, 156, 0.22);
+  --power-btn-enabled-inset:  rgba(4, 61, 40, 0.3);
+
+  /* ── Dashboard Power Button: Disabled ─────── */
+  --power-btn-disabled-border: rgba(255, 164, 178, 0.57);
+  --power-btn-disabled-bg-1:   #ff768c;
+  --power-btn-disabled-bg-2:   #e64e67;
+  --power-btn-disabled-bg-3:   #a82b42;
+  --power-btn-disabled-shadow: rgba(205, 54, 80, 0.3);
+  --power-btn-disabled-glow:   rgba(255, 100, 124, 0.2);
+  --power-btn-disabled-inset:  rgba(74, 9, 25, 0.3);
+
+  /* ── Dashboard Power Button: Busy ─────────── */
+  --power-btn-busy-border:    rgba(255, 219, 139, 0.6);
+  --power-btn-busy-bg-1:      #f9c75d;
+  --power-btn-busy-bg-2:      #e99b2f;
+  --power-btn-busy-bg-3:      #b76914;
+  --power-btn-busy-shadow:    rgba(221, 137, 28, 0.31);
+  --power-btn-busy-glow:      rgba(248, 184, 78, 0.23);
+  --power-btn-busy-inset:     rgba(91, 43, 4, 0.28);
+
+  /* ── Dashboard Power Button: Missing ──────── */
+  --power-btn-missing-border: rgba(255, 180, 100, 0.62);
+  --power-btn-missing-bg-1:   #ffb364;
+  --power-btn-missing-bg-2:   #e68c3a;
+  --power-btn-missing-bg-3:   #b86a22;
+  --power-btn-missing-shadow: rgba(200, 120, 40, 0.3);
+  --power-btn-missing-glow:   rgba(255, 163, 64, 0.2);
+  --power-btn-missing-inset:  rgba(80, 40, 10, 0.3);
+
+  /* ── Dashboard Power Rings ────────────────── */
+  --power-ring-default:       rgba(79, 140, 255, 0.12);
+  --power-ring-inner:         rgba(79, 140, 255, 0.18);
+  --power-ring-enabled:       rgba(54, 216, 156, 0.19);
+  --power-ring-disabled:      rgba(255, 100, 124, 0.18);
+  --power-ring-busy:          rgba(248, 184, 78, 0.2);
+  --power-ring-missing:       rgba(255, 163, 64, 0.22);
+
+  /* ── Dashboard State Badge ────────────────── */
+  --state-badge-border:       rgba(79, 140, 255, 0.18);
+  --state-badge-bg:           rgba(79, 140, 255, 0.08);
+  --state-badge-enabled-border: rgba(54, 216, 156, 0.2);
+  --state-badge-enabled-bg:   rgba(54, 216, 156, 0.08);
+  --state-badge-disabled-border: rgba(255, 100, 124, 0.2);
+  --state-badge-disabled-bg:  rgba(255, 100, 124, 0.08);
+  --state-badge-busy-border:  rgba(248, 184, 78, 0.22);
+  --state-badge-busy-bg:      rgba(248, 184, 78, 0.09);
+  --state-badge-missing-border: rgba(255, 163, 64, 0.22);
+  --state-badge-missing-bg:   rgba(255, 163, 64, 0.09);
+
+  /* ── Dashboard Action Buttons ─────────────── */
+  --dashboard-action-bg:      rgba(255, 255, 255, 0.035);
+  --dashboard-action-shadow:  inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  --dashboard-action-hover-bg: rgba(79, 140, 255, 0.1);
+
+  /* ── Dashboard Facts ──────────────────────── */
+  --dashboard-fact-border:    rgba(148, 175, 220, 0.09);
+  --dashboard-fact-bg:        rgba(255, 255, 255, 0.026);
+  --dashboard-fact-hover-border: rgba(119, 161, 255, 0.17);
+  --dashboard-fact-hover-bg:  rgba(255, 255, 255, 0.038);
+  --dashboard-fact-icon-color: #86adf5;
+  --dashboard-fact-icon-border: rgba(101, 150, 240, 0.13);
+  --dashboard-fact-icon-bg:   rgba(79, 140, 255, 0.07);
+  --dashboard-fact-active-shadow: 0 0 10px rgba(54, 216, 156, 0.7);
+  --dashboard-fact-warn-shadow: 0 0 10px rgba(248, 184, 78, 0.55);
+  --dashboard-fact-inactive-shadow: 0 0 10px rgba(255, 100, 124, 0.42);
+
+  /* ── Dashboard Steam Action ───────────────── */
+  --dashboard-steam-action-bg: rgba(255, 255, 255, 0.04);
+  --dashboard-steam-action-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  --dashboard-steam-action-hover-bg: rgba(79, 140, 255, 0.1);
+
+  /* ── Runtime Notices ──────────────────────── */
+  --notice-success-color:     #9df0cf;
+  --notice-success-border:    rgba(54, 216, 156, 0.18);
+  --notice-success-bg:        rgba(54, 216, 156, 0.075);
+  --notice-error-color:       #ffb0bd;
+  --notice-error-border:      rgba(255, 100, 124, 0.2);
+  --notice-error-bg:          rgba(255, 100, 124, 0.085);
+  --notice-close-hover-bg:    rgba(255, 255, 255, 0.07);
+
+  /* ── Scrollbar ────────────────────────────── */
+  --scrollbar-size:           9px;
+  --scrollbar-track:          transparent;
+  --scrollbar-thumb:          rgba(255, 255, 255, 0.12);
+  --scrollbar-thumb-hover:    rgba(255, 255, 255, 0.20);
+  --scrollbar-thumb-active:   rgba(255, 255, 255, 0.28);
+  --scrollbar-border:         2px solid transparent;
+
+  /* ── Selection ────────────────────────────── */
+  --selection-bg:             var(--accent-muted);
+  --selection-text:           var(--text-primary);
+
+  /* ── Context Menu ─────────────────────────── */
+  --ctx-bg-1:                 rgba(12, 20, 38, 0.98);
+  --ctx-bg-2:                 rgba(7, 14, 28, 0.99);
+  --ctx-border:               rgba(59, 130, 246, 0.14);
+  --ctx-shadow:               0 12px 40px -6px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(59, 130, 246, 0.08);
+  --ctx-item-hover-bg:        rgba(59, 130, 246, 0.10);
+  --ctx-item-hover-border:    rgba(59, 130, 246, 0.15);
+  --ctx-item-active-bg:       rgba(59, 130, 246, 0.16);
+  --ctx-item-active-border:   rgba(59, 130, 246, 0.22);
+  --ctx-item-danger-hover-bg: rgba(239, 68, 68, 0.12);
+  --ctx-item-danger-hover-border: rgba(239, 68, 68, 0.2);
+  --ctx-item-danger-color:    #fca5a5;
+  --ctx-header-color:         var(--text-primary);
+  --ctx-header-appid-color:   var(--text-tertiary);
+  --ctx-separator-color:      rgba(59, 130, 246, 0.08);
+  --ctx-item-color:           var(--text-secondary);
+  --ctx-item-icon-color:      var(--text-tertiary);
+
+  /* ── Game Card Overlay ────────────────────── */
+  --card-overlay-bg:          rgba(0, 0, 0, 0.65);
+  --card-overlay-focus-ring:  0 0 0 2px var(--accent);
+  --card-overlay-focus-offset: 2px;
+
+  /* ── Details Modal ────────────────────────── */
+  --details-backdrop-bg:      rgba(1, 7, 18, 0.82);
+  --details-bg-1:             rgba(16, 32, 59, 0.99);
+  --details-bg-2:             rgba(7, 17, 35, 0.99);
+  --details-border:           rgba(59, 130, 246, 0.12);
+  --details-shadow:           0 24px 80px -12px rgba(0, 0, 0, 0.6);
+  --details-text:             #d9e4f2;
+  --details-text-secondary:   #9cabc1;
+  --details-title-color:      #ffffff;
+  --details-hero-fade:        linear-gradient(to top, var(--surface-card) 0%, transparent 100%);
+  --details-info-label:       var(--text-tertiary);
+  --details-info-value:       var(--text-secondary);
+  --details-section-title:    var(--text-secondary);
+  --details-lua-bg:           rgba(255, 255, 255, 0.03);
+  --details-lua-border:       var(--border-subtle);
+  --details-error-color:      var(--red);
+  --details-error-bg:         var(--red-muted);
+  --details-close-color:      #7f8da4;
+  --details-close-hover-bg:   rgba(255, 255, 255, 0.07);
+  --details-close-hover-border: rgba(255, 255, 255, 0.08);
+  --details-badge-installed-bg: var(--green-muted);
+  --details-badge-installed-border: rgba(52, 211, 153, 0.2);
+  --details-badge-installed-color: var(--green);
+  --details-badge-lua-bg:     var(--accent-muted);
+  --details-badge-lua-border: var(--accent);
+  --details-badge-lua-color:  var(--accent);
+  --details-badge-missing-bg: var(--yellow-muted);
+  --details-badge-missing-border: rgba(251, 191, 36, 0.2);
+  --details-badge-missing-color: var(--yellow);
+  --details-badge-failed-bg:  var(--red-muted);
+  --details-badge-failed-border: rgba(239, 68, 68, 0.2);
+  --details-badge-failed-color: var(--red);
+
+  /* ── Fix Modal ─────────────────────────────── */
+  --fix-backdrop-bg:       rgba(1, 7, 18, 0.82);
+  --fix-bg-1:              rgba(16, 32, 59, 0.99);
+  --fix-bg-2:              rgba(7, 17, 35, 0.99);
+  --fix-border:            rgba(59, 130, 246, 0.12);
+  --fix-shadow:            0 24px 80px -12px rgba(0, 0, 0, 0.6);
+  --fix-close-color:       #7f8da4;
+  --fix-close-hover-bg:    rgba(255, 255, 255, 0.07);
+  --fix-close-hover-border: rgba(255, 255, 255, 0.08);
+  --fix-card-bg:           rgba(15, 23, 42, 0.65);
+  --fix-card-border:       rgba(59, 130, 246, 0.10);
+  --fix-card-hover:        rgba(15, 23, 44, 0.82);
+  --fix-card-completed-bg: rgba(52, 211, 153, 0.06);
+  --fix-card-completed-border: rgba(52, 211, 153, 0.18);
+  --fix-card-error-bg:     rgba(239, 68, 68, 0.06);
+  --fix-card-error-border: rgba(239, 68, 68, 0.18);
+  --fix-progress-bg:       rgba(59, 130, 246, 0.12);
+  --fix-progress-fill:     var(--accent);
+  --fix-warning-bg:        rgba(245, 158, 11, 0.08);
+  --fix-warning-border:    rgba(245, 158, 11, 0.20);
+  --fix-warning-color:     var(--yellow);
+  --fix-status-ok:         var(--green);
+  --fix-status-error:      var(--red);
+  --fix-status-running:    var(--accent);
+  --fix-status-manual:     var(--yellow);
+  --fix-error-bg:          rgba(239, 68, 68, 0.08);
+  --fix-error-border:      rgba(239, 68, 68, 0.15);
+  --fix-error-color:       var(--red);
+  --fix-skeleton-bg:       rgba(59, 130, 246, 0.06);
+  --fix-notice-color:      var(--text-secondary);
+  --fix-subtitle-color:    var(--text-secondary);
+  --fix-appid-color:       var(--text-tertiary);
+  --fix-manual-hint-color: var(--text-secondary);
+  --fix-manual-select-bg:  var(--surface-input);
+  --fix-manual-select-border: var(--border-default);
+  --fix-manual-select-color: var(--text-primary);
+  --fix-msg-ok-color:      var(--green);
+  --fix-msg-ok-bg:         var(--green-muted);
+}
+
+/* ── Theme: OLED Black ──────────────────── */
+[data-theme="oled-black"] {
+  --bg-base:             #000000;
+  --bg-surface:          #0a0a0a;
+  --bg-elevated:         #141414;
+  --bg-overlay:          rgba(0, 0, 0, 0.85);
+  --surface-card:        rgba(10, 10, 10, 0.75);
+  --surface-card-hover:  rgba(20, 20, 20, 0.85);
+  --surface-input:       rgba(0, 0, 0, 0.65);
+  --surface-sidebar:     rgba(0, 0, 0, 0.95);
+  --border-subtle:       rgba(255, 255, 255, 0.05);
+  --border-default:      rgba(255, 255, 255, 0.08);
+  --border-strong:       rgba(255, 255, 255, 0.14);
+  --border-focus:        rgba(255, 255, 255, 0.30);
+  --accent:              #60a5fa;
+  --accent-muted:        rgba(96, 165, 250, 0.10);
+  --accent-strong:       rgba(96, 165, 250, 0.20);
+  --accent-glow:         rgba(96, 165, 250, 0.22);
+  --green:               #34d399;
+  --green-muted:         rgba(52, 211, 153, 0.10);
+  --green-glow:          rgba(52, 211, 153, 0.30);
+  --red:                 #f87171;
+  --red-muted:           rgba(248, 113, 113, 0.10);
+  --red-glow:            rgba(248, 113, 113, 0.28);
+  --yellow:              #fbbf24;
+  --yellow-muted:        rgba(251, 191, 36, 0.10);
+  --orange:              #f97316;
+  --orange-muted:        rgba(249, 115, 22, 0.10);
+  --orange-glow:         rgba(249, 115, 22, 0.28);
+
+  --app-shell-glow:      rgba(96, 165, 250, 0.03);
+  --app-shell-bg-1:      #000000;
+  --app-shell-bg-2:      #050505;
+  --app-shell-bg-3:      #080808;
+  --app-shell-bg-4:      #0a0a0a;
+  --app-shell-border:    rgba(255, 255, 255, 0.05);
+
+  --sidebar-logo-gradient-start: #60a5fa;
+  --sidebar-logo-gradient-end:   #a78bfa;
+  --sidebar-logo-shadow:         rgba(96, 165, 250, 0.25);
+
+  --header-status-border: rgba(52, 211, 153, 0.12);
+  --header-status-dot-offline-shadow: rgba(251, 191, 36, 0.30);
+
+  --toggle-track-bg:     rgba(255, 255, 255, 0.10);
+
+  --btn-primary-hover-color: #93c5fd;
+  --btn-danger-hover-bg:     rgba(248, 113, 113, 0.16);
+  --btn-danger-hover-border: rgba(248, 113, 113, 0.28);
+  --btn-danger-hover-color:  #fca5a5;
+
+  --input-focus-shadow: 0 0 0 3px rgba(96, 165, 250, 0.08);
+
+  --settings-row-hover:       rgba(255, 255, 255, 0.015);
+  --settings-row-click-hover: rgba(255, 255, 255, 0.025);
+  --settings-status-badge-bg: rgba(255, 255, 255, 0.06);
+  --settings-status-badge-border: rgba(255, 255, 255, 0.10);
+
+  --surface-preview-solid:   rgba(10, 10, 10, 0.95);
+  --surface-preview-tinted:  linear-gradient(135deg, rgba(10, 10, 10, 0.70), rgba(96, 165, 250, 0.10));
+  --surface-preview-glass:   rgba(10, 10, 10, 0.40);
+  --surface-preview-fluent:  rgba(10, 10, 10, 0.35);
+
+  --provider-enabled-border: rgba(52, 211, 153, 0.18);
+  --provider-online-border:  rgba(52, 211, 153, 0.12);
+  --provider-warn-border:    rgba(251, 191, 36, 0.12);
+  --provider-cap-blue-border: rgba(96, 165, 250, 0.10);
+  --provider-cap-yellow-border: rgba(251, 191, 36, 0.10);
+  --provider-cap-gray-bg:   rgba(255, 255, 255, 0.05);
+  --provider-cap-gray-border: rgba(255, 255, 255, 0.08);
+  --provider-type-bg:       rgba(255, 255, 255, 0.04);
+  --provider-type-border:   rgba(255, 255, 255, 0.07);
+
+  --confirm-backdrop-glow:    rgba(96, 165, 250, 0.08);
+  --confirm-backdrop-bg:      rgba(0, 0, 0, 0.85);
+  --confirm-bg-1:             rgba(12, 12, 12, 0.99);
+  --confirm-bg-2:             rgba(4, 4, 4, 0.99);
+  --confirm-text:             #d0d0d0;
+  --confirm-text-secondary:   #888888;
+  --confirm-text-strong:      #e0e0e0;
+  --confirm-close-color:      #666666;
+  --confirm-close-hover-bg:   rgba(255, 255, 255, 0.06);
+  --confirm-close-hover-border: rgba(255, 255, 255, 0.07);
+  --confirm-title-color:      #ffffff;
+  --confirm-accent-rgb:       96, 165, 250;
+  --confirm-btn-primary-text: #0a0a0a;
+  --confirm-btn-secondary-text: #999999;
+  --confirm-btn-secondary-bg-1: rgba(255, 255, 255, 0.05);
+  --confirm-btn-secondary-bg-2: rgba(255, 255, 255, 0.02);
+  --confirm-btn-secondary-border: rgba(255, 255, 255, 0.09);
+  --confirm-btn-secondary-hover-bg-1: rgba(255, 255, 255, 0.08);
+  --confirm-btn-secondary-hover-bg-2: rgba(255, 255, 255, 0.03);
+  --confirm-btn-secondary-hover-border: rgba(255, 255, 255, 0.16);
+  --confirm-warning-color:    #c9a84c;
+  --confirm-warning-bg:       linear-gradient(135deg, rgba(201, 168, 76, 0.08), rgba(201, 168, 76, 0.02));
+  --confirm-warning-border:   rgba(201, 168, 76, 0.15);
+  --confirm-warning-icon:     #c9a84c;
+
+  --dashboard-bg:             #000000;
+  --dashboard-surface:        rgba(10, 10, 10, 0.78);
+  --dashboard-surface-strong: rgba(16, 16, 16, 0.94);
+  --dashboard-border:         rgba(255, 255, 255, 0.08);
+  --dashboard-border-hover:   rgba(96, 165, 250, 0.20);
+  --dashboard-text:           #e8e8e8;
+  --dashboard-text-soft:      #aaaaaa;
+  --dashboard-text-muted:     #666666;
+  --dashboard-blue:           #60a5fa;
+  --dashboard-blue-light:     #93c5fd;
+  --dashboard-green:          #34d399;
+  --dashboard-yellow:         #fbbf24;
+  --dashboard-red:            #f87171;
+  --dashboard-orange:         #f97316;
+
+  --dashboard-hero-bg-1:      rgba(12, 12, 12, 0.96);
+  --dashboard-hero-bg-2:      rgba(6, 6, 6, 0.98);
+  --dashboard-hero-bg-3:      rgba(2, 2, 2, 1);
+  --dashboard-hero-shadow:    0 24px 70px rgba(0, 0, 0, 0.5);
+  --dashboard-hero-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  --dashboard-hero-grid-color: rgba(255, 255, 255, 0.015);
+
+  --power-btn-border:         rgba(147, 197, 253, 0.50);
+  --power-btn-bg-1:           #60a5fa;
+  --power-btn-bg-2:           #4a90e2;
+  --power-btn-bg-3:           #3574c4;
+  --power-btn-shadow-color:   rgba(36, 99, 215, 0.30);
+  --power-btn-glow-color:     rgba(96, 165, 250, 0.18);
+  --power-btn-inset-dark:     rgba(0, 0, 0, 0.35);
+  --power-btn-enabled-border: rgba(144, 255, 215, 0.55);
+  --power-btn-enabled-bg-1:   #34d399;
+  --power-btn-enabled-bg-2:   #22b983;
+  --power-btn-enabled-bg-3:   #148761;
+  --power-btn-enabled-shadow: rgba(24, 169, 114, 0.25);
+  --power-btn-enabled-glow:   rgba(52, 211, 153, 0.18);
+  --power-btn-enabled-inset:  rgba(0, 0, 0, 0.30);
+  --power-btn-disabled-border: rgba(248, 113, 113, 0.50);
+  --power-btn-disabled-bg-1:   #f87171;
+  --power-btn-disabled-bg-2:   #e64e67;
+  --power-btn-disabled-bg-3:   #a82b42;
+  --power-btn-disabled-shadow: rgba(205, 54, 80, 0.25);
+  --power-btn-disabled-glow:   rgba(248, 113, 113, 0.18);
+  --power-btn-disabled-inset:  rgba(0, 0, 0, 0.30);
+  --power-btn-busy-border:    rgba(251, 191, 36, 0.55);
+  --power-btn-busy-bg-1:      #fbbf24;
+  --power-btn-busy-bg-2:      #e5a61a;
+  --power-btn-busy-bg-3:      #b77e10;
+  --power-btn-busy-shadow:    rgba(200, 150, 20, 0.25);
+  --power-btn-busy-glow:      rgba(251, 191, 36, 0.18);
+  --power-btn-busy-inset:     rgba(0, 0, 0, 0.28);
+  --power-btn-missing-border: rgba(249, 115, 22, 0.55);
+  --power-btn-missing-bg-1:   #f97316;
+  --power-btn-missing-bg-2:   #e06810;
+  --power-btn-missing-bg-3:   #b8520c;
+  --power-btn-missing-shadow: rgba(200, 100, 20, 0.25);
+  --power-btn-missing-glow:   rgba(249, 115, 22, 0.18);
+  --power-btn-missing-inset:  rgba(0, 0, 0, 0.30);
+
+  --power-ring-default:       rgba(96, 165, 250, 0.10);
+  --power-ring-inner:         rgba(96, 165, 250, 0.16);
+  --power-ring-enabled:       rgba(52, 211, 153, 0.16);
+  --power-ring-disabled:      rgba(248, 113, 113, 0.16);
+  --power-ring-busy:          rgba(251, 191, 36, 0.18);
+  --power-ring-missing:       rgba(249, 115, 22, 0.18);
+
+  --state-badge-border:       rgba(96, 165, 250, 0.16);
+  --state-badge-bg:           rgba(96, 165, 250, 0.07);
+  --state-badge-enabled-border: rgba(52, 211, 153, 0.18);
+  --state-badge-enabled-bg:   rgba(52, 211, 153, 0.07);
+  --state-badge-disabled-border: rgba(248, 113, 113, 0.18);
+  --state-badge-disabled-bg:  rgba(248, 113, 113, 0.07);
+  --state-badge-busy-border:  rgba(251, 191, 36, 0.20);
+  --state-badge-busy-bg:      rgba(251, 191, 36, 0.08);
+  --state-badge-missing-border: rgba(249, 115, 22, 0.20);
+  --state-badge-missing-bg:   rgba(249, 115, 22, 0.08);
+
+  --dashboard-action-bg:      rgba(255, 255, 255, 0.03);
+  --dashboard-action-shadow:  inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  --dashboard-action-hover-bg: rgba(96, 165, 250, 0.08);
+
+  --dashboard-fact-border:    rgba(255, 255, 255, 0.06);
+  --dashboard-fact-bg:        rgba(255, 255, 255, 0.02);
+  --dashboard-fact-hover-border: rgba(96, 165, 250, 0.14);
+  --dashboard-fact-hover-bg:  rgba(255, 255, 255, 0.03);
+  --dashboard-fact-icon-color: #93c5fd;
+  --dashboard-fact-icon-border: rgba(96, 165, 250, 0.10);
+  --dashboard-fact-icon-bg:   rgba(96, 165, 250, 0.06);
+  --dashboard-fact-active-shadow: 0 0 10px rgba(52, 211, 153, 0.6);
+  --dashboard-fact-warn-shadow: 0 0 10px rgba(251, 191, 36, 0.45);
+  --dashboard-fact-inactive-shadow: 0 0 10px rgba(248, 113, 113, 0.35);
+
+  --dashboard-steam-action-bg: rgba(255, 255, 255, 0.03);
+  --dashboard-steam-action-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  --dashboard-steam-action-hover-bg: rgba(96, 165, 250, 0.08);
+
+  --notice-success-color:     #6ee7b7;
+  --notice-success-border:    rgba(52, 211, 153, 0.15);
+  --notice-success-bg:        rgba(52, 211, 153, 0.06);
+  --notice-error-color:       #fca5a5;
+  --notice-error-border:      rgba(248, 113, 113, 0.16);
+  --notice-error-bg:          rgba(248, 113, 113, 0.07);
+  --notice-close-hover-bg:    rgba(255, 255, 255, 0.06);
+
+  /* scrollbar: pure black track, gray thumb */
+  --scrollbar-track:          rgba(0, 0, 0, 0.5);
+  --scrollbar-thumb:          rgba(255, 255, 255, 0.10);
+  --scrollbar-thumb-hover:    rgba(255, 255, 255, 0.18);
+  --scrollbar-thumb-active:   rgba(255, 255, 255, 0.26);
+}
+
+/* ── Theme: Steam Gray ──────────────────── */
+[data-theme="steam-gray"] {
+  --bg-base:             #1b2838;
+  --bg-surface:          #1e2a3a;
+  --bg-elevated:         #2a475e;
+  --bg-overlay:          rgba(27, 40, 56, 0.88);
+  --surface-card:        rgba(30, 42, 58, 0.70);
+  --surface-card-hover:  rgba(42, 71, 94, 0.80);
+  --surface-input:       rgba(11, 19, 28, 0.65);
+  --surface-sidebar:     rgba(11, 19, 28, 0.92);
+  --border-subtle:       rgba(102, 192, 255, 0.06);
+  --border-default:      rgba(102, 192, 255, 0.10);
+  --border-strong:       rgba(102, 192, 255, 0.18);
+  --border-focus:        rgba(102, 192, 255, 0.40);
+  --accent:              #66c0ff;
+  --accent-muted:        rgba(102, 192, 255, 0.12);
+  --accent-strong:       rgba(102, 192, 255, 0.22);
+  --accent-glow:         rgba(102, 192, 255, 0.25);
+  --green:               #4ade80;
+  --green-muted:         rgba(74, 222, 128, 0.12);
+  --green-glow:          rgba(74, 222, 128, 0.35);
+  --red:                 #f87171;
+  --red-muted:           rgba(248, 113, 113, 0.10);
+  --red-glow:            rgba(248, 113, 113, 0.30);
+  --yellow:              #fbbf24;
+  --yellow-muted:        rgba(251, 191, 36, 0.12);
+  --orange:              #fb923c;
+  --orange-muted:        rgba(251, 146, 60, 0.12);
+  --orange-glow:         rgba(251, 146, 60, 0.30);
+
+  --app-shell-glow:      rgba(102, 192, 255, 0.04);
+  --app-shell-bg-1:      #171d26;
+  --app-shell-bg-2:      #1b2838;
+  --app-shell-bg-3:      #1e2d40;
+  --app-shell-bg-4:      #1b2838;
+  --app-shell-border:    rgba(102, 192, 255, 0.08);
+
+  --sidebar-logo-gradient-start: #66c0ff;
+  --sidebar-logo-gradient-end:   #b8d4ff;
+  --sidebar-logo-shadow:         rgba(102, 192, 255, 0.3);
+
+  --header-status-border: rgba(74, 222, 128, 0.15);
+  --header-status-dot-offline-shadow: rgba(251, 191, 36, 0.35);
+
+  --toggle-track-bg:     rgba(148, 163, 184, 0.12);
+
+  --btn-primary-hover-color: #a0d8ff;
+  --btn-danger-hover-bg:     rgba(248, 113, 113, 0.18);
+  --btn-danger-hover-border: rgba(248, 113, 113, 0.30);
+  --btn-danger-hover-color:  #fca5a5;
+
+  --input-focus-shadow: 0 0 0 3px rgba(102, 192, 255, 0.08);
+
+  --settings-row-hover:       rgba(255, 255, 255, 0.018);
+  --settings-row-click-hover: rgba(255, 255, 255, 0.032);
+  --settings-status-badge-bg: rgba(148, 163, 184, 0.08);
+  --settings-status-badge-border: rgba(148, 163, 184, 0.12);
+
+  --surface-preview-solid:   rgba(30, 42, 58, 0.95);
+  --surface-preview-tinted:  linear-gradient(135deg, rgba(30, 42, 58, 0.70), rgba(102, 192, 255, 0.12));
+  --surface-preview-glass:   rgba(30, 42, 58, 0.40);
+  --surface-preview-fluent:  rgba(28, 38, 52, 0.35);
+
+  --provider-enabled-border: rgba(74, 222, 128, 0.20);
+  --provider-online-border:  rgba(74, 222, 128, 0.15);
+  --provider-warn-border:    rgba(251, 191, 36, 0.15);
+  --provider-cap-blue-border: rgba(102, 192, 255, 0.12);
+  --provider-cap-yellow-border: rgba(251, 191, 36, 0.12);
+  --provider-cap-gray-bg:   rgba(148, 163, 184, 0.08);
+  --provider-cap-gray-border: rgba(148, 163, 184, 0.12);
+  --provider-type-bg:       rgba(148, 163, 184, 0.06);
+  --provider-type-border:   rgba(148, 163, 184, 0.10);
+
+  --confirm-backdrop-glow:    rgba(102, 192, 255, 0.10);
+  --confirm-backdrop-bg:      rgba(11, 19, 28, 0.85);
+  --confirm-bg-1:             rgba(20, 32, 48, 0.99);
+  --confirm-bg-2:             rgba(11, 19, 28, 0.99);
+  --confirm-text:             #d9e4f2;
+  --confirm-text-secondary:   #9cabc1;
+  --confirm-text-strong:      #dce8f8;
+  --confirm-close-color:      #7f8da4;
+  --confirm-close-hover-bg:   rgba(255, 255, 255, 0.07);
+  --confirm-close-hover-border: rgba(255, 255, 255, 0.08);
+  --confirm-title-color:      #ffffff;
+  --confirm-accent-rgb:       102, 192, 255;
+  --confirm-btn-primary-text: #0e1a28;
+  --confirm-btn-secondary-text: #aab8cc;
+  --confirm-btn-secondary-bg-1: rgba(255, 255, 255, 0.055);
+  --confirm-btn-secondary-bg-2: rgba(255, 255, 255, 0.025);
+  --confirm-btn-secondary-border: rgba(255, 255, 255, 0.105);
+  --confirm-btn-secondary-hover-bg-1: rgba(255, 255, 255, 0.09);
+  --confirm-btn-secondary-hover-bg-2: rgba(255, 255, 255, 0.04);
+  --confirm-btn-secondary-hover-border: rgba(255, 255, 255, 0.18);
+  --confirm-warning-color:    #d8bb70;
+  --confirm-warning-bg:       linear-gradient(135deg, rgba(246, 193, 76, 0.085), rgba(246, 193, 76, 0.03));
+  --confirm-warning-border:   rgba(246, 193, 76, 0.17);
+  --confirm-warning-icon:     #e8be57;
+
+  --dashboard-bg:             #141d28;
+  --dashboard-surface:        rgba(20, 29, 40, 0.78);
+  --dashboard-surface-strong: rgba(24, 34, 48, 0.94);
+  --dashboard-border:         rgba(102, 192, 255, 0.10);
+  --dashboard-border-hover:   rgba(102, 192, 255, 0.22);
+  --dashboard-text:           #e8f0f8;
+  --dashboard-text-soft:      #b0c4d8;
+  --dashboard-text-muted:     #6888a8;
+  --dashboard-blue:           #66c0ff;
+  --dashboard-blue-light:     #90d4ff;
+  --dashboard-green:          #4ade80;
+  --dashboard-yellow:         #fbbf24;
+  --dashboard-red:            #f87171;
+  --dashboard-orange:         #fb923c;
+
+  --dashboard-hero-bg-1:      rgba(24, 38, 56, 0.96);
+  --dashboard-hero-bg-2:      rgba(16, 26, 38, 0.98);
+  --dashboard-hero-bg-3:      rgba(11, 19, 28, 1);
+  --dashboard-hero-shadow:    0 24px 70px rgba(0, 0, 0, 0.35);
+  --dashboard-hero-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  --dashboard-hero-grid-color: rgba(255, 255, 255, 0.018);
+
+  --power-btn-border:         rgba(140, 210, 255, 0.55);
+  --power-btn-bg-1:           #66c0ff;
+  --power-btn-bg-2:           #4da8e8;
+  --power-btn-bg-3:           #3488c8;
+  --power-btn-shadow-color:   rgba(40, 100, 200, 0.36);
+  --power-btn-glow-color:     rgba(102, 192, 255, 0.20);
+  --power-btn-inset-dark:     rgba(11, 19, 28, 0.32);
+  --power-btn-enabled-border: rgba(144, 255, 215, 0.62);
+  --power-btn-enabled-bg-1:   #4ade80;
+  --power-btn-enabled-bg-2:   #2bc47a;
+  --power-btn-enabled-bg-3:   #169460;
+  --power-btn-enabled-shadow: rgba(24, 169, 114, 0.3);
+  --power-btn-enabled-glow:   rgba(74, 222, 128, 0.22);
+  --power-btn-enabled-inset:  rgba(4, 61, 40, 0.3);
+  --power-btn-disabled-border: rgba(255, 164, 178, 0.57);
+  --power-btn-disabled-bg-1:   #ff768c;
+  --power-btn-disabled-bg-2:   #e64e67;
+  --power-btn-disabled-bg-3:   #a82b42;
+  --power-btn-disabled-shadow: rgba(205, 54, 80, 0.3);
+  --power-btn-disabled-glow:   rgba(255, 100, 124, 0.2);
+  --power-btn-disabled-inset:  rgba(74, 9, 25, 0.3);
+  --power-btn-busy-border:    rgba(255, 219, 139, 0.6);
+  --power-btn-busy-bg-1:      #f9c75d;
+  --power-btn-busy-bg-2:      #e99b2f;
+  --power-btn-busy-bg-3:      #b76914;
+  --power-btn-busy-shadow:    rgba(221, 137, 28, 0.31);
+  --power-btn-busy-glow:      rgba(248, 184, 78, 0.23);
+  --power-btn-busy-inset:     rgba(91, 43, 4, 0.28);
+  --power-btn-missing-border: rgba(255, 180, 100, 0.62);
+  --power-btn-missing-bg-1:   #ffb364;
+  --power-btn-missing-bg-2:   #e68c3a;
+  --power-btn-missing-bg-3:   #b86a22;
+  --power-btn-missing-shadow: rgba(200, 120, 040, 0.3);
+  --power-btn-missing-glow:   rgba(255, 163, 64, 0.2);
+  --power-btn-missing-inset:  rgba(80, 40, 10, 0.3);
+
+  --power-ring-default:       rgba(102, 192, 255, 0.12);
+  --power-ring-inner:         rgba(102, 192, 255, 0.18);
+  --power-ring-enabled:       rgba(74, 222, 128, 0.19);
+  --power-ring-disabled:      rgba(255, 100, 124, 0.18);
+  --power-ring-busy:          rgba(248, 184, 78, 0.20);
+  --power-ring-missing:       rgba(255, 163, 64, 0.22);
+
+  --state-badge-border:       rgba(102, 192, 255, 0.18);
+  --state-badge-bg:           rgba(102, 192, 255, 0.08);
+  --state-badge-enabled-border: rgba(74, 222, 128, 0.20);
+  --state-badge-enabled-bg:   rgba(74, 222, 128, 0.08);
+  --state-badge-disabled-border: rgba(255, 100, 124, 0.20);
+  --state-badge-disabled-bg:  rgba(255, 100, 124, 0.08);
+  --state-badge-busy-border:  rgba(248, 184, 78, 0.22);
+  --state-badge-busy-bg:      rgba(248, 184, 78, 0.09);
+  --state-badge-missing-border: rgba(255, 163, 64, 0.22);
+  --state-badge-missing-bg:   rgba(255, 163, 64, 0.09);
+
+  --dashboard-action-bg:      rgba(255, 255, 255, 0.035);
+  --dashboard-action-shadow:  inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  --dashboard-action-hover-bg: rgba(102, 192, 255, 0.10);
+
+  --dashboard-fact-border:    rgba(102, 192, 255, 0.08);
+  --dashboard-fact-bg:        rgba(255, 255, 255, 0.026);
+  --dashboard-fact-hover-border: rgba(102, 192, 255, 0.17);
+  --dashboard-fact-hover-bg:  rgba(255, 255, 255, 0.038);
+  --dashboard-fact-icon-color: #90d4ff;
+  --dashboard-fact-icon-border: rgba(102, 192, 255, 0.13);
+  --dashboard-fact-icon-bg:   rgba(102, 192, 255, 0.07);
+  --dashboard-fact-active-shadow: 0 0 10px rgba(74, 222, 128, 0.7);
+  --dashboard-fact-warn-shadow: 0 0 10px rgba(248, 184, 78, 0.55);
+  --dashboard-fact-inactive-shadow: 0 0 10px rgba(255, 100, 124, 0.42);
+
+  --dashboard-steam-action-bg: rgba(255, 255, 255, 0.04);
+  --dashboard-steam-action-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  --dashboard-steam-action-hover-bg: rgba(102, 192, 255, 0.10);
+
+  --notice-success-color:     #9df0cf;
+  --notice-success-border:    rgba(74, 222, 128, 0.18);
+  --notice-success-bg:        rgba(74, 222, 128, 0.075);
+  --notice-error-color:       #ffb0bd;
+  --notice-error-border:      rgba(255, 100, 124, 0.20);
+  --notice-error-bg:          rgba(255, 100, 124, 0.085);
+  --notice-close-hover-bg:    rgba(255, 255, 255, 0.07);
+
+  /* scrollbar: dark blue track, cyan-tinted thumb */
+  --scrollbar-track:          rgba(11, 19, 28, 0.5);
+  --scrollbar-thumb:          rgba(102, 192, 255, 0.12);
+  --scrollbar-thumb-hover:    rgba(102, 192, 255, 0.22);
+  --scrollbar-thumb-active:   rgba(102, 192, 255, 0.30);
+}
+
+/* ── Theme: Crimson Dark ────────────────── */
+[data-theme="crimson-dark"] {
+  --bg-base:             #0f0810;
+  --bg-surface:          #160e18;
+  --bg-elevated:         #1f1424;
+  --bg-overlay:          rgba(15, 8, 16, 0.88);
+  --surface-card:        rgba(22, 14, 24, 0.70);
+  --surface-card-hover:  rgba(35, 20, 38, 0.80);
+  --surface-input:       rgba(8, 4, 10, 0.65);
+  --surface-sidebar:     rgba(10, 5, 12, 0.94);
+  --border-subtle:       rgba(220, 50, 80, 0.06);
+  --border-default:      rgba(220, 50, 80, 0.10);
+  --border-strong:       rgba(220, 50, 80, 0.18);
+  --border-focus:        rgba(220, 50, 80, 0.40);
+  --accent:              #f472b6;
+  --accent-muted:        rgba(244, 114, 182, 0.12);
+  --accent-strong:       rgba(244, 114, 182, 0.22);
+  --accent-glow:         rgba(244, 114, 182, 0.25);
+  --green:               #4ade80;
+  --green-muted:         rgba(74, 222, 128, 0.12);
+  --green-glow:          rgba(74, 222, 128, 0.35);
+  --red:                 #fb7185;
+  --red-muted:           rgba(251, 113, 133, 0.10);
+  --red-glow:            rgba(251, 113, 133, 0.30);
+  --yellow:              #fbbf24;
+  --yellow-muted:        rgba(251, 191, 36, 0.12);
+  --orange:              #fb923c;
+  --orange-muted:        rgba(251, 146, 60, 0.12);
+  --orange-glow:         rgba(251, 146, 60, 0.30);
+
+  --app-shell-glow:      rgba(244, 114, 182, 0.04);
+  --app-shell-bg-1:      #0a050c;
+  --app-shell-bg-2:      #0f0810;
+  --app-shell-bg-3:      #140c16;
+  --app-shell-bg-4:      #0f0810;
+  --app-shell-border:    rgba(220, 50, 80, 0.06);
+
+  --sidebar-logo-gradient-start: #f472b6;
+  --sidebar-logo-gradient-end:   #c084fc;
+  --sidebar-logo-shadow:         rgba(244, 114, 182, 0.3);
+
+  --header-status-border: rgba(74, 222, 128, 0.15);
+  --header-status-dot-offline-shadow: rgba(251, 191, 36, 0.35);
+
+  --toggle-track-bg:     rgba(148, 163, 184, 0.12);
+
+  --btn-primary-hover-color: #f9a8d4;
+  --btn-danger-hover-bg:     rgba(251, 113, 133, 0.18);
+  --btn-danger-hover-border: rgba(251, 113, 133, 0.30);
+  --btn-danger-hover-color:  #fda4af;
+
+  --input-focus-shadow: 0 0 0 3px rgba(244, 114, 182, 0.08);
+
+  --settings-row-hover:       rgba(255, 255, 255, 0.015);
+  --settings-row-click-hover: rgba(255, 255, 255, 0.03);
+  --settings-status-badge-bg: rgba(148, 163, 184, 0.08);
+  --settings-status-badge-border: rgba(148, 163, 184, 0.12);
+
+  --surface-preview-solid:   rgba(22, 14, 24, 0.95);
+  --surface-preview-tinted:  linear-gradient(135deg, rgba(22, 14, 24, 0.70), rgba(244, 114, 182, 0.12));
+  --surface-preview-glass:   rgba(22, 14, 24, 0.40);
+  --surface-preview-fluent:  rgba(20, 12, 22, 0.35);
+
+  --provider-enabled-border: rgba(74, 222, 128, 0.20);
+  --provider-online-border:  rgba(74, 222, 128, 0.15);
+  --provider-warn-border:    rgba(251, 191, 36, 0.15);
+  --provider-cap-blue-border: rgba(244, 114, 182, 0.12);
+  --provider-cap-yellow-border: rgba(251, 191, 36, 0.12);
+  --provider-cap-gray-bg:   rgba(148, 163, 184, 0.08);
+  --provider-cap-gray-border: rgba(148, 163, 184, 0.12);
+  --provider-type-bg:       rgba(148, 163, 184, 0.06);
+  --provider-type-border:   rgba(148, 163, 184, 0.10);
+
+  --confirm-backdrop-glow:    rgba(244, 114, 182, 0.10);
+  --confirm-backdrop-bg:      rgba(8, 4, 10, 0.85);
+  --confirm-bg-1:             rgba(22, 14, 26, 0.99);
+  --confirm-bg-2:             rgba(10, 5, 12, 0.99);
+  --confirm-text:             #e8d4e0;
+  --confirm-text-secondary:   #a88898;
+  --confirm-text-strong:      #f0dce8;
+  --confirm-close-color:      #8a6878;
+  --confirm-close-hover-bg:   rgba(255, 255, 255, 0.07);
+  --confirm-close-hover-border: rgba(255, 255, 255, 0.08);
+  --confirm-title-color:      #ffffff;
+  --confirm-accent-rgb:       244, 114, 182;
+  --confirm-btn-primary-text: #1a0818;
+  --confirm-btn-secondary-text: #b89aa8;
+  --confirm-btn-secondary-bg-1: rgba(255, 255, 255, 0.055);
+  --confirm-btn-secondary-bg-2: rgba(255, 255, 255, 0.025);
+  --confirm-btn-secondary-border: rgba(255, 255, 255, 0.105);
+  --confirm-btn-secondary-hover-bg-1: rgba(255, 255, 255, 0.09);
+  --confirm-btn-secondary-hover-bg-2: rgba(255, 255, 255, 0.04);
+  --confirm-btn-secondary-hover-border: rgba(255, 255, 255, 0.18);
+  --confirm-warning-color:    #d8bb70;
+  --confirm-warning-bg:       linear-gradient(135deg, rgba(246, 193, 76, 0.085), rgba(246, 193, 76, 0.03));
+  --confirm-warning-border:   rgba(246, 193, 76, 0.17);
+  --confirm-warning-icon:     #e8be57;
+
+  --dashboard-bg:             #0c0610;
+  --dashboard-surface:        rgba(18, 10, 20, 0.78);
+  --dashboard-surface-strong: rgba(24, 14, 28, 0.94);
+  --dashboard-border:         rgba(220, 50, 80, 0.10);
+  --dashboard-border-hover:   rgba(244, 114, 182, 0.22);
+  --dashboard-text:           #f0e0ea;
+  --dashboard-text-soft:      #c0a0b0;
+  --dashboard-text-muted:     #785868;
+  --dashboard-blue:           #f472b6;
+  --dashboard-blue-light:     #f9a8d4;
+  --dashboard-green:          #4ade80;
+  --dashboard-yellow:         #fbbf24;
+  --dashboard-red:            #fb7185;
+  --dashboard-orange:         #fb923c;
+
+  --dashboard-hero-bg-1:      rgba(24, 14, 28, 0.96);
+  --dashboard-hero-bg-2:      rgba(14, 8, 18, 0.98);
+  --dashboard-hero-bg-3:      rgba(8, 4, 10, 1);
+  --dashboard-hero-shadow:    0 24px 70px rgba(0, 0, 0, 0.35);
+  --dashboard-hero-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  --dashboard-hero-grid-color: rgba(255, 255, 255, 0.018);
+
+  --power-btn-border:         rgba(244, 150, 200, 0.55);
+  --power-btn-bg-1:           #f472b6;
+  --power-btn-bg-2:           #e0509a;
+  --power-btn-bg-3:           #b83480;
+  --power-btn-shadow-color:   rgba(200, 40, 120, 0.36);
+  --power-btn-glow-color:     rgba(244, 114, 182, 0.20);
+  --power-btn-inset-dark:     rgba(20, 8, 24, 0.32);
+  --power-btn-enabled-border: rgba(144, 255, 215, 0.62);
+  --power-btn-enabled-bg-1:   #4ade80;
+  --power-btn-enabled-bg-2:   #2bc47a;
+  --power-btn-enabled-bg-3:   #169460;
+  --power-btn-enabled-shadow: rgba(24, 169, 114, 0.3);
+  --power-btn-enabled-glow:   rgba(74, 222, 128, 0.22);
+  --power-btn-enabled-inset:  rgba(4, 61, 40, 0.3);
+  --power-btn-disabled-border: rgba(251, 140, 160, 0.57);
+  --power-btn-disabled-bg-1:   #fb7185;
+  --power-btn-disabled-bg-2:   #e64e67;
+  --power-btn-disabled-bg-3:   #a82b42;
+  --power-btn-disabled-shadow: rgba(205, 54, 80, 0.3);
+  --power-btn-disabled-glow:   rgba(251, 113, 133, 0.2);
+  --power-btn-disabled-inset:  rgba(74, 9, 25, 0.3);
+  --power-btn-busy-border:    rgba(255, 219, 139, 0.6);
+  --power-btn-busy-bg-1:      #f9c75d;
+  --power-btn-busy-bg-2:      #e99b2f;
+  --power-btn-busy-bg-3:      #b76914;
+  --power-btn-busy-shadow:    rgba(221, 137, 28, 0.31);
+  --power-btn-busy-glow:      rgba(248, 184, 78, 0.23);
+  --power-btn-busy-inset:     rgba(91, 43, 4, 0.28);
+  --power-btn-missing-border: rgba(255, 180, 100, 0.62);
+  --power-btn-missing-bg-1:   #ffb364;
+  --power-btn-missing-bg-2:   #e68c3a;
+  --power-btn-missing-bg-3:   #b86a22;
+  --power-btn-missing-shadow: rgba(200, 120, 40, 0.3);
+  --power-btn-missing-glow:   rgba(255, 163, 64, 0.2);
+  --power-btn-missing-inset:  rgba(80, 40, 10, 0.3);
+
+  --power-ring-default:       rgba(220, 50, 80, 0.12);
+  --power-ring-inner:         rgba(220, 50, 80, 0.18);
+  --power-ring-enabled:       rgba(74, 222, 128, 0.19);
+  --power-ring-disabled:      rgba(251, 113, 133, 0.18);
+  --power-ring-busy:          rgba(248, 184, 78, 0.20);
+  --power-ring-missing:       rgba(255, 163, 64, 0.22);
+
+  --state-badge-border:       rgba(244, 114, 182, 0.18);
+  --state-badge-bg:           rgba(244, 114, 182, 0.08);
+  --state-badge-enabled-border: rgba(74, 222, 128, 0.20);
+  --state-badge-enabled-bg:   rgba(74, 222, 128, 0.08);
+  --state-badge-disabled-border: rgba(251, 113, 133, 0.20);
+  --state-badge-disabled-bg:  rgba(251, 113, 133, 0.08);
+  --state-badge-busy-border:  rgba(248, 184, 78, 0.22);
+  --state-badge-busy-bg:      rgba(248, 184, 78, 0.09);
+  --state-badge-missing-border: rgba(255, 163, 64, 0.22);
+  --state-badge-missing-bg:   rgba(255, 163, 64, 0.09);
+
+  --dashboard-action-bg:      rgba(255, 255, 255, 0.035);
+  --dashboard-action-shadow:  inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  --dashboard-action-hover-bg: rgba(244, 114, 182, 0.10);
+
+  --dashboard-fact-border:    rgba(220, 50, 80, 0.08);
+  --dashboard-fact-bg:        rgba(255, 255, 255, 0.026);
+  --dashboard-fact-hover-border: rgba(244, 114, 182, 0.17);
+  --dashboard-fact-hover-bg:  rgba(255, 255, 255, 0.038);
+  --dashboard-fact-icon-color: #f9a8d4;
+  --dashboard-fact-icon-border: rgba(244, 114, 182, 0.13);
+  --dashboard-fact-icon-bg:   rgba(244, 114, 182, 0.07);
+  --dashboard-fact-active-shadow: 0 0 10px rgba(74, 222, 128, 0.7);
+  --dashboard-fact-warn-shadow: 0 0 10px rgba(248, 184, 78, 0.55);
+  --dashboard-fact-inactive-shadow: 0 0 10px rgba(251, 113, 133, 0.42);
+
+  --dashboard-steam-action-bg: rgba(255, 255, 255, 0.04);
+  --dashboard-steam-action-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  --dashboard-steam-action-hover-bg: rgba(244, 114, 182, 0.10);
+
+  --notice-success-color:     #86efac;
+  --notice-success-border:    rgba(74, 222, 128, 0.18);
+  --notice-success-bg:        rgba(74, 222, 128, 0.075);
+  --notice-error-color:       #fda4af;
+  --notice-error-border:      rgba(251, 113, 133, 0.20);
+  --notice-error-bg:          rgba(251, 113, 133, 0.085);
+  --notice-close-hover-bg:    rgba(255, 255, 255, 0.07);
+
+  /* scrollbar: dark track, crimson-tinted thumb */
+  --scrollbar-track:          rgba(8, 4, 10, 0.5);
+  --scrollbar-thumb:          rgba(244, 114, 182, 0.12);
+  --scrollbar-thumb-hover:    rgba(244, 114, 182, 0.22);
+  --scrollbar-thumb-active:   rgba(244, 114, 182, 0.30);
+}
+
+/* ── Surface: Solid ─────────────────────── */
+[data-surface="solid"] {
+  --surface-card:        rgba(15, 23, 42, 0.95);
+  --surface-card-hover:  rgba(15, 23, 42, 1);
+  --surface-input:       rgba(2, 6, 23, 0.85);
+  --surface-sidebar:     rgba(2, 6, 23, 1);
+}
+
+/* ── Surface: Glass ─────────────────────── */
+[data-surface="glass"] {
+  --surface-card:        rgba(15, 23, 42, 0.45);
+  --surface-card-hover:  rgba(15, 23, 42, 0.60);
+  --surface-input:       rgba(2, 6, 23, 0.40);
+  --surface-sidebar:     rgba(15, 23, 42, 0.75);
+}
+
+[data-theme="oled-black"][data-surface="solid"] {
+  --surface-card:        rgba(10, 10, 10, 0.95);
+  --surface-card-hover:  rgba(16, 16, 16, 1);
+  --surface-input:       rgba(0, 0, 0, 0.85);
+  --surface-sidebar:     rgba(0, 0, 0, 1);
+}
+
+[data-theme="oled-black"][data-surface="glass"] {
+  --surface-card:        rgba(10, 10, 10, 0.45);
+  --surface-card-hover:  rgba(10, 10, 10, 0.60);
+  --surface-input:       rgba(0, 0, 0, 0.40);
+  --surface-sidebar:     rgba(10, 10, 10, 0.75);
+}
+
+[data-theme="steam-gray"][data-surface="solid"] {
+  --surface-card:        rgba(30, 42, 58, 0.95);
+  --surface-card-hover:  rgba(30, 42, 58, 1);
+  --surface-input:       rgba(11, 19, 28, 0.85);
+  --surface-sidebar:     rgba(11, 19, 28, 1);
+}
+
+[data-theme="steam-gray"][data-surface="glass"] {
+  --surface-card:        rgba(30, 42, 58, 0.45);
+  --surface-card-hover:  rgba(30, 42, 58, 0.60);
+  --surface-input:       rgba(11, 19, 28, 0.40);
+  --surface-sidebar:     rgba(11, 19, 28, 0.75);
+}
+
+[data-theme="crimson-dark"][data-surface="solid"] {
+  --surface-card:        rgba(22, 14, 24, 0.95);
+  --surface-card-hover:  rgba(22, 14, 24, 1);
+  --surface-input:       rgba(8, 4, 10, 0.85);
+  --surface-sidebar:     rgba(10, 5, 12, 1);
+}
+
+[data-theme="crimson-dark"][data-surface="glass"] {
+  --surface-card:        rgba(22, 14, 24, 0.45);
+  --surface-card-hover:  rgba(22, 14, 24, 0.60);
+  --surface-input:       rgba(8, 4, 10, 0.40);
+  --surface-sidebar:     rgba(10, 5, 12, 0.75);
+}
+
+/* ── Theme: Custom / Dynamic — Surface Materials ─── */
+/* Palette primitives (--custom-*) are set inline by JS
+   (Dynamic reuses the same pipeline with the Windows
+   accent color). Surface materials are composed here via
+   CSS so that [data-surface] selectors always win over
+   inline styles. */
+
+[data-theme="custom"],
+[data-theme="dynamic"] {
+  --surface-card:        rgba(var(--custom-surface-rgb), 0.65);
+  --surface-card-hover:  rgba(var(--custom-surface-rgb), 0.82);
+  --surface-input:       rgba(var(--custom-bg-rgb), 0.6);
+  --surface-sidebar:     rgba(var(--custom-bg-rgb), 0.92);
+  /* scrollbar: derive from surface, not accent */
+  --scrollbar-track:     rgba(var(--custom-bg-rgb), 0.4);
+  --scrollbar-thumb:     rgba(var(--custom-surface-rgb), 0.35);
+  --scrollbar-thumb-hover:   rgba(var(--custom-surface-rgb), 0.50);
+  --scrollbar-thumb-active:  rgba(var(--custom-surface-rgb), 0.65);
+}
+
+[data-theme="custom"][data-surface="solid"],
+[data-theme="dynamic"][data-surface="solid"] {
+  --surface-card:        rgba(var(--custom-surface-rgb), 0.95);
+  --surface-card-hover:  rgba(var(--custom-surface-rgb), 1);
+  --surface-input:       rgba(var(--custom-bg-rgb), 0.85);
+  --surface-sidebar:     rgba(var(--custom-bg-rgb), 1);
+}
+
+[data-theme="custom"][data-surface="glass"],
+[data-theme="dynamic"][data-surface="glass"] {
+  --surface-card:        rgba(var(--custom-surface-rgb), 0.45);
+  --surface-card-hover:  rgba(var(--custom-surface-rgb), 0.60);
+  --surface-input:       rgba(var(--custom-bg-rgb), 0.40);
+  --surface-sidebar:     rgba(var(--custom-surface-rgb), 0.75);
+}
+
+/* ── Surface: Fluent (Windows 11 Mica / Win10 Acrylic) ─── */
+/* The shell stays translucent so the OS backdrop shows through.
+   Shell background vars are overridden inline by JS when the
+   Fluent surface is active. */
+
+[data-surface="fluent"] {
+  --surface-card:        rgba(18, 24, 34, 0.42);
+  --surface-card-hover:  rgba(18, 24, 34, 0.58);
+  --surface-input:       rgba(6, 10, 16, 0.34);
+  --surface-sidebar:     rgba(16, 22, 32, 0.60);
+}
+
+[data-theme="oled-black"][data-surface="fluent"] {
+  --surface-card:        rgba(10, 10, 10, 0.42);
+  --surface-card-hover:  rgba(10, 10, 10, 0.58);
+  --surface-input:       rgba(0, 0, 0, 0.34);
+  --surface-sidebar:     rgba(10, 10, 10, 0.60);
+}
+
+[data-theme="steam-gray"][data-surface="fluent"] {
+  --surface-card:        rgba(28, 38, 52, 0.42);
+  --surface-card-hover:  rgba(28, 38, 52, 0.58);
+  --surface-input:       rgba(8, 15, 24, 0.34);
+  --surface-sidebar:     rgba(22, 32, 44, 0.60);
+}
+
+[data-theme="crimson-dark"][data-surface="fluent"] {
+  --surface-card:        rgba(20, 12, 22, 0.42);
+  --surface-card-hover:  rgba(20, 12, 22, 0.58);
+  --surface-input:       rgba(6, 3, 8, 0.34);
+  --surface-sidebar:     rgba(16, 8, 18, 0.60);
+}
+
+[data-theme="custom"][data-surface="fluent"],
+[data-theme="dynamic"][data-surface="fluent"] {
+  --surface-card:        rgba(var(--custom-surface-rgb), 0.42);
+  --surface-card-hover:  rgba(var(--custom-surface-rgb), 0.58);
+  --surface-input:       rgba(var(--custom-bg-rgb), 0.34);
+  --surface-sidebar:     rgba(var(--custom-bg-rgb), 0.60);
+}
+
+/* ── Density: Compact ───────────────────── */
+[data-density="compact"] {
+  --sp-3:                8px;
+  --sp-4:                12px;
+  --sp-5:                16px;
+  --header-height:       44px;
+}
+
+/* ── Selection ──────────────────────────── */
+::selection {
+  background: var(--selection-bg);
+  color: var(--selection-text);
+}
+
+/* ── Reduced Motion ─────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast:       0ms;
+    --duration-normal:     0ms;
+    --duration-slow:       0ms;
+    --duration-sidebar:    0ms;
+  }
+}
+
+[data-reduce-motion="true"] {
+  --duration-fast:       0ms;
+  --duration-normal:     0ms;
+  --duration-slow:       0ms;
+  --duration-sidebar:    0ms;
+}

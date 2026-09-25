@@ -1,0 +1,58 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "LumaForge Panel",
+  "version": "0.1.0",
+  "identifier": "com.einey.lumaforge-panel",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1431",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "LumaForge Panel",
+        "width": 850,
+        "height": 530,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "resizable": false,
+        "maximizable": true,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost data:; connect-src 'self' ipc: http://ipc.localhost; font-src 'self' data:"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI1ODA5MEIyOUM4MzI4RjgKUldUNEtJT2NzcENBSmVoWEFqOExuZllENktiRlRZbGQybndlZy8zU21YNjFUZnY5WGtPTGhBQXMK",
+      "endpoints": [
+        "https://github.com/eisora08/lumaforge-panel/releases/latest/download/latest.json"
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "createUpdaterArtifacts": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "displayLanguageSelector": false,
+        "startMenuFolder": "LumaForge Panel"
+      }
+    }
+  }
+}
