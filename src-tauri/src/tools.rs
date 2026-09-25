@@ -93,13 +93,7 @@ impl ToolDef {
         }
     }
 
-    fn plugin_dir_name(&self) -> Option<&'static str> {
-        match self.target {
-            DeployTarget::Plugins { dir } => Some(dir),
-            _ => None,
-        }
     }
-}
 
 // Per-OS deploy layouts. The CDP proxy Linux build ships `libXtst.so.6` +
 // `liblumaforge.so` inside `ubuntu12_32/`; Windows ships `wsock32.dll` +
@@ -182,7 +176,7 @@ pub const TOOL_DEFS: &[ToolDef] = &[
         },
         toggle: &["dwmapi.dll", "xinput1_4.dll", "OpenSteamTool.dll"],
         installed: &["dwmapi.dll", "xinput1_4.dll", "OpenSteamTool.dll"],
-        post_install: &[PostInstall::CreateLuaDir],
+        post_install: &[PostInstall::SetupOst],
     },
     ToolDef {
         id: "cloud_redirect",
@@ -270,7 +264,7 @@ fn component_state(root: &Path, rel_paths: &[&str]) -> ComponentState {
 }
 
 /// State of a tool: the deployed files, falling back to the installed
-/// evidence (`lumaforge\` etc.) and finally to an empty payload dir.
+/// evidence (`lumaforge\` etc.).
 pub fn tool_state(def: &ToolDef) -> ComponentState {
     let steam_root = paths::detect_steam_root().unwrap_or_default();
 
@@ -287,23 +281,18 @@ pub fn tool_state(def: &ToolDef) -> ComponentState {
         }
     }
 
-    // Fallback: payload extracted but never deployed (or renamed away).
-    if github::is_dir_populated(&paths::thirdparty_dir().join(def.id)) {
-        if def.plugin_dir_name().is_some() {
-            return ComponentState::Disabled;
-        }
-        return ComponentState::Missing;
-    }
-
     ComponentState::Missing
 }
 
+/// Only `Payload` tools keep their files in `thirdparty/{id}` — Steam-root and
+/// plugin tools deploy straight to their target and leave nothing behind.
 pub fn payload_dir(def: &ToolDef) -> PathBuf {
     paths::thirdparty_dir().join(def.id)
 }
 
 pub fn payload_installed(def: &ToolDef) -> bool {
-    github::is_dir_populated(&payload_dir(def))
+    matches!(def.target, DeployTarget::Payload)
+        && github::is_dir_populated(&payload_dir(def))
 }
 
 // ---------------------------------------------------------------------------
@@ -357,6 +346,14 @@ fn flip_all(root: &Path, rels: &[&str], enable: bool) -> Result<(), String> {
 /// Generic toggle used by every switch on the dashboard.
 /// Returns `(message, restart_required)`.
 pub fn set_enabled(app: &tauri::AppHandle, def: &ToolDef, enable: bool) -> Result<(String, bool), String> {
+    let result = set_enabled_inner(app, def, enable);
+    if let Err(error) = &result {
+        log_line("error", &format!("{} toggle({enable}) failed: {error}", def.name));
+    }
+    result
+}
+
+fn set_enabled_inner(app: &tauri::AppHandle, def: &ToolDef, enable: bool) -> Result<(String, bool), String> {
     if !def.platform.matches() {
         return Err(format!("{} is not available on this OS.", def.name));
     }
@@ -402,6 +399,25 @@ pub fn set_enabled(app: &tauri::AppHandle, def: &ToolDef, enable: bool) -> Resul
 // Install
 // ---------------------------------------------------------------------------
 
+/// Append a line to `%TEMP%\panel.log` so install failures are never silent.
+fn log_line(step: &str, message: &str) {
+    use std::io::Write;
+
+    let ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    let line = format!("[{ms}] [{step}] {message}\n");
+
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(paths::temp_dir().join("panel.log"))
+    {
+        let _ = file.write_all(line.as_bytes());
+    }
+}
+
 fn emit_progress(app: &tauri::AppHandle, step: &str, message: impl Into<String>) {
     #[derive(Clone, Serialize)]
     #[serde(rename_all = "camelCase")]
@@ -410,11 +426,13 @@ fn emit_progress(app: &tauri::AppHandle, step: &str, message: impl Into<String>)
         message: String,
     }
 
+    let message = message.into();
+    log_line(step, &message);
     let _ = app.emit(
         "panel://progress",
         Progress {
             step: step.to_string(),
-            message: message.into(),
+            message,
         },
     );
 }
@@ -434,11 +452,10 @@ fn copy_entry(src: &Path, dst: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Deploy the extracted payload to its target (Steam root or plugins dir).
-/// Stops Steam first when a Steam-root file is in use.
-fn deploy(app: &tauri::AppHandle, def: &ToolDef) -> Result<bool, String> {
-    let target_dir = payload_dir(def);
-
+/// Deploy the extracted payload (rooted at `src`) to its target (Steam root
+/// or plugins dir). Stops Steam first when a Steam-root file is in use.
+/// Every declared file must be present — anything short of that is an error.
+fn deploy(app: &tauri::AppHandle, def: &ToolDef, src: &Path) -> Result<bool, String> {
     match def.target {
         DeployTarget::Payload => {
             // Everything lives in the payload dir; wiring happens in the
@@ -452,7 +469,7 @@ fn deploy(app: &tauri::AppHandle, def: &ToolDef) -> Result<bool, String> {
                 github::remove_dir_recursive(&dst)?;
             }
             std::fs::create_dir_all(&dst).map_err(|e| e.to_string())?;
-            github::copy_dir_recursive(&target_dir, &dst)?;
+            github::copy_dir_recursive(src, &dst)?;
             Ok(false)
         }
         DeployTarget::SteamRoot { files } => {
@@ -461,61 +478,37 @@ fn deploy(app: &tauri::AppHandle, def: &ToolDef) -> Result<bool, String> {
             emit_progress(app, "deploy", "Deploying files to the Steam directory…");
 
             let mut restart_required = false;
-            let mut copied = 0usize;
-            let mut missing: Vec<String> = Vec::new();
             let mut errors: Vec<String> = Vec::new();
 
             let copy_once = |rel: &str| -> Result<(), String> {
-                let src = target_dir.join(rel);
-                if !src.exists() {
+                let from = src.join(rel);
+                if !from.exists() {
                     return Err(format!("{rel} not found in release"));
                 }
-                copy_entry(&src, &steam_root.join(rel))
+                copy_entry(&from, &steam_root.join(rel))
             };
 
             for rel in files {
-                match copy_once(rel) {
-                    Ok(()) => copied += 1,
-                    Err(e) => {
-                        // Locked DLL: stop Steam, then retry once.
-                        let locked = steam::is_steam_running();
-                        if locked {
-                            steam::ensure_steam_stopped()?;
-                            restart_required = true;
-                            match copy_once(rel) {
-                                Ok(()) => copied += 1,
-                                Err(e2) => errors.push(e2),
-                            }
-                        } else if e.contains("not found in release") {
-                            missing.push(rel.to_string());
-                        } else {
-                            errors.push(e);
+                if let Err(e) = copy_once(rel) {
+                    // Locked DLL: stop Steam, then retry once.
+                    if steam::is_steam_running() {
+                        steam::ensure_steam_stopped()?;
+                        restart_required = true;
+                        if let Err(e2) = copy_once(rel) {
+                            errors.push(e2);
                         }
+                    } else {
+                        errors.push(e);
                     }
                 }
             }
 
-            if copied == 0 {
-                return Err(format!(
-                    "Nothing could be deployed: {} — the release does not include \
-                     the expected file layout yet.",
-                    if errors.is_empty() {
-                        format!("missing {}", missing.join(", "))
-                    } else {
-                        errors.join(", ")
-                    }
-                ));
-            }
-
-            if !missing.is_empty() {
-                eprintln!(
-                    "[PANEL] {} optional files not present in release: {}",
-                    def.name,
-                    missing.join(", ")
-                );
-            }
             if !errors.is_empty() {
-                return Err(errors.join("; "));
+                return Err(format!(
+                    "Deploy of {} failed: {}",
+                    def.name,
+                    errors.join("; ")
+                ));
             }
 
             Ok(restart_required)
@@ -534,9 +527,23 @@ fn run_post_install(app: &tauri::AppHandle, def: &ToolDef) -> Result<(), String>
     postinstall::run_all(def.post_install, &steam_root)
 }
 
-/// Download the latest release, extract it into `thirdparty/{id}` and deploy.
+/// Download the latest release, extract it into a temp dir and deploy from
+/// there. Only `Payload` tools persist their files (`thirdparty/{id}`);
+/// everything else deploys straight to the target and leaves no staging.
 /// Returns `(message, restart_required)`.
 pub fn install(
+    app: &tauri::AppHandle,
+    def: &ToolDef,
+    force: bool,
+) -> Result<(String, bool), String> {
+    let result = install_inner(app, def, force);
+    if let Err(error) = &result {
+        log_line("error", &format!("{} install failed: {error}", def.name));
+    }
+    result
+}
+
+fn install_inner(
     app: &tauri::AppHandle,
     def: &ToolDef,
     force: bool,
@@ -545,10 +552,11 @@ pub fn install(
         return Err(format!("{} is not available on this OS.", def.name));
     }
 
+    let is_payload = matches!(def.target, DeployTarget::Payload);
     let target_dir = payload_dir(def);
-    std::fs::create_dir_all(&target_dir).map_err(|e| format!("Failed to create tool dir: {e}"))?;
 
-    if !force && github::is_dir_populated(&target_dir) {
+    // Reuse an already-persisted payload (Payload tools only).
+    if is_payload && !force && github::is_dir_populated(&target_dir) {
         let state = state::load_state();
         if !state.tools.contains_key(def.id) {
             let (owner, repo, asset, contains) = def.resolve_github();
@@ -559,7 +567,7 @@ pub fn install(
         }
 
         emit_progress(app, "deploy", "Files already present — deploying…");
-        let restart_required = deploy(app, def)?;
+        let restart_required = deploy(app, def, &target_dir)?;
         run_post_install(app, def)?;
         return Ok((format!("{} is already installed.", def.name), restart_required));
     }
@@ -592,21 +600,28 @@ pub fn install(
             .map_err(|e| format!("Download failed: {e}"))?;
 
         emit_progress(app, "extract", "Extracting…");
-        if release.archive_ext == "dll" || release.archive_ext == "so" {
-            let dest = target_dir.join(&release.zip_name);
-            std::fs::copy(&archive_path, &dest).map_err(|e| format!("Failed to copy library: {e}"))?;
+        let effective_src = if release.archive_ext == "dll" || release.archive_ext == "so" {
+            // The archive *is* the deployable file, already sitting at
+            // `temp_dir/{zip_name}` — which matches the deploy rel path.
+            temp_dir.clone()
         } else {
             let extract_dir = temp_dir.join("extracted");
             github::extract_archive(&archive_path, &release.archive_ext, &extract_dir)
                 .map_err(|e| format!("Extraction failed: {e}"))?;
-            let effective_src = github::flatten_extracted_dir(&extract_dir).unwrap_or(extract_dir);
+            github::flatten_extracted_dir(&extract_dir).unwrap_or(extract_dir)
+        };
+
+        // Payload tools persist their files; everyone else deploys straight
+        // from the temp dir so `thirdparty/{id}` never gets created for them.
+        if is_payload {
+            std::fs::create_dir_all(&target_dir)
+                .map_err(|e| format!("Failed to create tool dir: {e}"))?;
             github::copy_dir_recursive(&effective_src, &target_dir)?;
         }
 
-        state::record_install(def.id, &release.tag_name, true)?;
-
-        let restart_required = deploy(app, def)?;
+        let restart_required = deploy(app, def, &effective_src)?;
         run_post_install(app, def)?;
+        state::record_install(def.id, &release.tag_name, true)?;
         let _ = std::fs::remove_dir_all(&temp_dir);
 
         Ok((

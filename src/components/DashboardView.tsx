@@ -140,12 +140,27 @@ export function DashboardView() {
     [refresh, toast]
   );
 
+  const openInstallModal = useCallback(
+    (kind: ModalKind) => {
+      setModal(kind);
+      void runWithProgress(async () => {
+        if (kind?.kind === 'install-tool') {
+          return invoke<PanelResult>('install_tool', {
+            toolId: kind.toolId,
+          });
+        }
+        return invoke<PanelResult>('install_runtime');
+      });
+    },
+    [runWithProgress]
+  );
+
   const handleCdpToggle = useCallback(async () => {
-    if (!status || busy) return;
+    if (!status || busy || modal) return;
     const desired = status.cdp !== 'enabled';
 
     if (status.cdp === 'missing') {
-      setModal({ kind: 'install-runtime' });
+      openInstallModal({ kind: 'install-runtime' });
       return;
     }
 
@@ -172,15 +187,15 @@ export function DashboardView() {
         setRestartOpen(true);
       }
     }
-  }, [status, busy, refresh, toast]);
+  }, [status, busy, modal, openInstallModal, refresh, toast]);
 
   const handleToolToggle = useCallback(
     async (tool: ToolStatus) => {
-      if (busy) return;
+      if (busy || modal) return;
       const desired = tool.state !== 'enabled';
 
       if (desired && !tool.installed) {
-        setModal({
+        openInstallModal({
           kind: 'install-tool',
           toolId: tool.id,
           toolName: tool.name,
@@ -213,22 +228,7 @@ export function DashboardView() {
         }
       }
     },
-    [busy, refresh, toast]
-  );
-
-  const openInstallModal = useCallback(
-    (kind: ModalKind) => {
-      setModal(kind);
-      void runWithProgress(async () => {
-        if (kind?.kind === 'install-tool') {
-          return invoke<PanelResult>('install_tool', {
-            toolId: kind.toolId,
-          });
-        }
-        return invoke<PanelResult>('install_runtime');
-      });
-    },
-    [runWithProgress]
+    [busy, modal, openInstallModal, refresh, toast]
   );
 
   const startSteam = useCallback(async () => {
@@ -391,7 +391,7 @@ export function DashboardView() {
                 type="button"
                 className="btn btn-primary btn-sm panel-banner-btn"
                 onClick={() => openInstallModal({ kind: 'install-runtime' })}
-                disabled={busy !== null}
+                disabled={busy !== null || modal !== null}
               >
                 {status.runtimeUpdateAvailable ? 'UPDATE' : 'INSTALL'}
               </button>
@@ -447,7 +447,7 @@ export function DashboardView() {
                 onClick={() => {
                   void handleCdpToggle();
                 }}
-                disabled={cdpBusy || (loading && !status)}
+                disabled={cdpBusy || modal !== null || (loading && !status)}
                 aria-pressed={cdpState === 'enabled'}
                 aria-busy={cdpBusy}
                 aria-label={
@@ -492,7 +492,7 @@ export function DashboardView() {
                     <button
                       type="button"
                       className="btn btn-secondary btn-sm panel-component-update"
-                      disabled={toggleBusy}
+                      disabled={toggleBusy || modal !== null}
                       onClick={() => {
                         openInstallModal({
                           kind: 'install-tool',
@@ -502,6 +502,21 @@ export function DashboardView() {
                       }}
                     >
                       UPDATE
+                    </button>
+                  ) : tool.state === 'missing' ? (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm panel-component-update"
+                      disabled={toggleBusy || modal !== null}
+                      onClick={() => {
+                        openInstallModal({
+                          kind: 'install-tool',
+                          toolId: tool.id,
+                          toolName: tool.name,
+                        });
+                      }}
+                    >
+                      INSTALL
                     </button>
                   ) : (
                     <span className="panel-component-version">
@@ -518,7 +533,7 @@ export function DashboardView() {
                     aria-checked={tool.state === 'enabled'}
                     aria-label={`Toggle ${tool.name}`}
                     aria-busy={toggleBusy}
-                    disabled={toggleBusy || loading}
+                    disabled={toggleBusy || modal !== null || loading}
                     onClick={() => {
                       void handleToolToggle(tool);
                     }}

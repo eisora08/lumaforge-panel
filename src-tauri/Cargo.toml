@@ -1,6 +1,6 @@
 [package]
 name = "lumaforge-panel"
-version = "0.1.0"
+version = "0.1.1"
 description = "LumaForge Panel — dashboard for the LumaForge Steam runtime"
 authors = ["eisora08"]
 edition = "2021"

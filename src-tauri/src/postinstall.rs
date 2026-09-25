@@ -9,8 +9,8 @@ use crate::paths;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum PostInstall {
-    /// OpenSteamTool needs `{steam}/config/lua` for its Lua scripts.
-    CreateLuaDir,
+    /// OpenSteamTool: `{steam}/config/lua` + seed/patch `{steam}/opensteamtool.toml`.
+    SetupOst,
     /// CloudRedirect: set `[cloud] enabled = true` in `{steam}/opensteamtool.toml`.
     PatchOstToml,
     /// SLSsteam: patch steam.sh with LD_AUDIT, write steam.cfg, seed config.yaml.
@@ -26,7 +26,7 @@ pub fn run_all(hooks: &[PostInstall], steam_root: &Path) -> Result<(), String> {
 
 pub fn run(hook: PostInstall, steam_root: &Path) -> Result<(), String> {
     match hook {
-        PostInstall::CreateLuaDir => create_lua_dir(steam_root),
+        PostInstall::SetupOst => setup_ost(steam_root),
         PostInstall::PatchOstToml => patch_opensteamtool_cloud_enabled(steam_root).map(|_| ()),
         PostInstall::SlssteamSetup => slssteam_setup(steam_root),
     }
@@ -45,13 +45,117 @@ pub fn on_toggle(hooks: &[PostInstall], enable: bool, steam_root: &Path) -> Resu
 }
 
 // ---------------------------------------------------------------------------
-// CreateLuaDir
+// SetupOst (OpenSteamTool: config/lua + opensteamtool.toml)
 // ---------------------------------------------------------------------------
 
-fn create_lua_dir(steam_root: &Path) -> Result<(), String> {
+/// The file we seed when `{steam}/opensteamtool.toml` does not exist yet.
+const DEFAULT_OST_TOML: &str = "[cloud]\nenabled = true\n\n[manifest]\nurl = \"manifestdex\"\n";
+
+fn setup_ost(steam_root: &Path) -> Result<(), String> {
+    // OST loads its scripts from `{steam}/config/lua` (dllmain.cpp) — create
+    // it recursively so a missing `config\` directory is fine too.
     let lua_dir = steam_root.join("config").join("lua");
     fs::create_dir_all(&lua_dir)
-        .map_err(|e| format!("Failed to create {}: {e}", lua_dir.display()))
+        .map_err(|e| format!("Failed to create {}: {e}", lua_dir.display()))?;
+
+    ensure_ost_toml(steam_root)
+}
+
+/// Force `[cloud] enabled = true` and `[manifest] url = "manifestdex"` in
+/// `{steam}/opensteamtool.toml`, creating the file when absent. Everything
+/// else in an existing file (sections, comments, user values) is preserved.
+fn ensure_ost_toml(steam_root: &Path) -> Result<(), String> {
+    let toml_path = steam_root.join("opensteamtool.toml");
+
+    if !toml_path.exists() {
+        fs::write(&toml_path, DEFAULT_OST_TOML)
+            .map_err(|e| format!("Failed to create opensteamtool.toml: {e}"))?;
+        return Ok(());
+    }
+
+    let before = fs::read_to_string(&toml_path)
+        .map_err(|e| format!("Failed to read opensteamtool.toml: {e}"))?;
+    if before.contains("enabled = true")
+        && before.contains("[manifest]")
+        && before.contains("url = \"manifestdex\"")
+    {
+        return Ok(());
+    }
+
+    // One-shot backup before the first modification.
+    let bak_path = toml_path.with_extension("toml.ost.bak");
+    if !bak_path.exists() {
+        let _ = fs::copy(&toml_path, &bak_path);
+    }
+
+    let newline = if before.contains("\r\n") { "\r\n" } else { "\n" };
+    let mut lines: Vec<String> = before
+        .split('\n')
+        .map(|l| l.trim_end_matches('\r').to_string())
+        .collect();
+
+    force_toml_value(&mut lines, "cloud", "enabled", "true");
+    force_toml_value(&mut lines, "manifest", "url", "manifestdex");
+
+    fs::write(&toml_path, lines.join(newline))
+        .map_err(|e| format!("Failed to write opensteamtool.toml: {e}"))
+}
+
+/// Ensure `<section>` has `key = "value"` (string values are always quoted;
+/// `value` here is the raw text without quotes). Creates the section when it
+/// is missing. Existing unrelated lines are untouched.
+fn force_toml_value(lines: &mut Vec<String>, section: &str, key: &str, value: &str) {
+    let header = format!("[{section}]");
+    let expected = format!("{key} = \"{value}\"");
+
+    // Locate the top-level section header (single `[x]`, not `[[x]]` or `[a.b]`).
+    let mut section_idx: Option<usize> = None;
+    for (i, line) in lines.iter().enumerate() {
+        let t = line.trim();
+        if t.starts_with('[') && !t.starts_with("[[") && t.ends_with(']') && !t.contains('.') {
+            if t.eq_ignore_ascii_case(&header) {
+                section_idx = Some(i);
+                break;
+            }
+        }
+    }
+
+    let Some(start) = section_idx else {
+        // Section absent → append it with the key.
+        if !lines.is_empty() && !lines.last().map(|l| l.trim().is_empty()).unwrap_or(false) {
+            lines.push(String::new());
+        }
+        lines.push(header);
+        lines.push(expected);
+        return;
+    };
+
+    // Find the end of the section (next top-level header).
+    let end = lines
+        .iter()
+        .enumerate()
+        .skip(start + 1)
+        .find(|(_, line)| {
+            let t = line.trim();
+            t.starts_with('[') && !t.starts_with("[[") && t.ends_with(']') && !t.contains('.')
+        })
+        .map(|(i, _)| i)
+        .unwrap_or(lines.len());
+
+    // Replace an existing `key = …` inside the section, else insert after it.
+    for i in (start + 1)..end {
+        let t = lines[i].trim();
+        if t.starts_with(key)
+            && t[key.len()..].trim_start().starts_with('=')
+            && t[..key.len()].eq_ignore_ascii_case(key)
+        {
+            if lines[i].trim() != expected {
+                lines[i] = expected.clone();
+            }
+            return;
+        }
+    }
+    lines.insert(start + 1, expected);
 }
 
 // ---------------------------------------------------------------------------
