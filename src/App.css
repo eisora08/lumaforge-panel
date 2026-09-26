@@ -427,6 +427,12 @@ html[data-window-maximized="true"] .app-shell {
   flex-shrink: 0;
 }
 
+.header-icon img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
 .app-header-title {
   font-size: var(--text-md);
   font-weight: var(--weight-bold);

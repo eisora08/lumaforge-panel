@@ -6,7 +6,6 @@ import { relaunch } from '@tauri-apps/plugin-process';
 import {
   Minus,
   X,
-  PanelTop,
   Settings as SettingsIcon,
   RefreshCw,
 } from 'lucide-react';
@@ -251,7 +250,7 @@ function Shell() {
         <header className="app-header" data-tauri-drag-region>
           <div className="header-left">
             <span className="header-icon" data-tauri-drag-region>
-              <PanelTop size={16} aria-hidden="true" />
+              <img src="/icon.svg" alt="" aria-hidden="true" />
             </span>
             <span className="app-header-title" data-tauri-drag-region>
               LumaForge
