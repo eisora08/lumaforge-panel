@@ -268,7 +268,8 @@ function Shell() {
                   )
                 }
               >
-                ({updateCount})
+                <RefreshCw size={14} aria-hidden="true" />
+                <span className="update-badge-count">{updateCount}</span>
               </button>
             )}
           </div>

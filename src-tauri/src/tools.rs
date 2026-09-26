@@ -115,7 +115,7 @@ const CDP_TOGGLE: &[&str] = if IS_LINUX {
 const CDP_INSTALLED: &[&str] = if IS_LINUX {
     &["ubuntu12_32/liblumaforge.so"]
 } else {
-    &["lumaforge"]
+    &["lumaforge/lumaforge.dll", "lumaforge/lumaforge_cef_hook.dll"]
 };
 
 const CLOUD_REDIRECT_ASSET: Option<&str> = if IS_LINUX {
@@ -263,25 +263,26 @@ fn component_state(root: &Path, rel_paths: &[&str]) -> ComponentState {
     }
 }
 
-/// State of a tool: the deployed files, falling back to the installed
-/// evidence (`lumaforge\` etc.).
+/// State of a tool. Every installed marker must be on disk (live or backed
+/// up); if any is missing the tool is a broken/partial install and reports
+/// `Missing` so the INSTALL button can repair it — e.g. `wsock32.dll` alone
+/// without the `lumaforge\` DLLs is not "installed".
 pub fn tool_state(def: &ToolDef) -> ComponentState {
     let steam_root = paths::detect_steam_root().unwrap_or_default();
+    let Some(root) = def.root(&steam_root) else {
+        return ComponentState::Missing;
+    };
 
-    if let Some(root) = def.root(&steam_root) {
-        let state = component_state(&root, def.toggle);
-        if state != ComponentState::Missing {
-            return state;
-        }
-
-        // Loader/runtime present but the toggle path is gone entirely
-        // (e.g. `lumaforge\` exists without `wsock32.dll` at all).
-        if component_state(&root, def.installed) != ComponentState::Missing {
-            return ComponentState::Disabled;
-        }
+    if !def.installed.is_empty()
+        && def.installed.iter().any(|rel| {
+            let path = resolve_rel(&root, rel);
+            !path.exists() && !PathBuf::from(format!("{}.bak", path.display())).exists()
+        })
+    {
+        return ComponentState::Missing;
     }
 
-    ComponentState::Missing
+    component_state(&root, def.toggle)
 }
 
 /// Only `Payload` tools keep their files in `thirdparty/{id}` — Steam-root and
@@ -463,7 +464,7 @@ fn deploy(app: &tauri::AppHandle, def: &ToolDef, src: &Path) -> Result<bool, Str
             Ok(false)
         }
         DeployTarget::Plugins { dir } => {
-            emit_progress(app, "deploy", "Copying plugin files…");
+            emit_progress(app, "deploy", "Copying plugin files...");
             let dst = paths::plugins_dir().join(dir);
             if dst.exists() {
                 github::remove_dir_recursive(&dst)?;
@@ -475,7 +476,7 @@ fn deploy(app: &tauri::AppHandle, def: &ToolDef, src: &Path) -> Result<bool, Str
         DeployTarget::SteamRoot { files } => {
             let steam_root = paths::detect_steam_root()
                 .ok_or_else(|| "Steam root not found.".to_string())?;
-            emit_progress(app, "deploy", "Deploying files to the Steam directory…");
+            emit_progress(app, "deploy", "Deploying files to the Steam directory...");
 
             let mut restart_required = false;
             let mut errors: Vec<String> = Vec::new();
@@ -503,6 +504,20 @@ fn deploy(app: &tauri::AppHandle, def: &ToolDef, src: &Path) -> Result<bool, Str
                 }
             }
 
+            // The deploy is only complete when every installed marker made it
+            // to disk — catches archives shipped without the expected files
+            // instead of leaving a half-install that looks fine.
+            if errors.is_empty() {
+                for rel in def.installed {
+                    let path = resolve_rel(&steam_root, rel);
+                    if !path.exists()
+                        && !PathBuf::from(format!("{}.bak", path.display())).exists()
+                    {
+                        errors.push(format!("{rel} missing after deploy"));
+                    }
+                }
+            }
+
             if !errors.is_empty() {
                 return Err(format!(
                     "Deploy of {} failed: {}",
@@ -522,8 +537,8 @@ fn run_post_install(app: &tauri::AppHandle, def: &ToolDef) -> Result<(), String>
         return Ok(());
     }
     let steam_root = paths::detect_steam_root()
-        .ok_or_else(|| "Steam root not found — cannot finish setup.".to_string())?;
-    emit_progress(app, "setup", "Running post-install setup…");
+        .ok_or_else(|| "Steam root not found - cannot finish setup.".to_string())?;
+    emit_progress(app, "setup", "Running post-install setup...");
     postinstall::run_all(def.post_install, &steam_root)
 }
 
@@ -566,13 +581,13 @@ fn install_inner(
             let _ = state::record_install(def.id, &version, true);
         }
 
-        emit_progress(app, "deploy", "Files already present — deploying…");
+        emit_progress(app, "deploy", "Files already present - deploying...");
         let restart_required = deploy(app, def, &target_dir)?;
         run_post_install(app, def)?;
         return Ok((format!("{} is already installed.", def.name), restart_required));
     }
 
-    emit_progress(app, "fetch", format!("Fetching {} release…", def.name));
+    emit_progress(app, "fetch", format!("Fetching {} release...", def.name));
     let (owner, repo, asset, contains) = def.resolve_github();
     let release = github::get_latest_github_release(owner, repo, asset, contains)
         .map_err(|e| {
@@ -593,13 +608,13 @@ fn install_inner(
         emit_progress(
             app,
             "download",
-            format!("Downloading {} v{}…", def.name, release.tag_name),
+            format!("Downloading {} v{}...", def.name, release.tag_name),
         );
         let archive_path = temp_dir.join(&release.zip_name);
         github::download_file(&release.zip_url, &archive_path)
             .map_err(|e| format!("Download failed: {e}"))?;
 
-        emit_progress(app, "extract", "Extracting…");
+        emit_progress(app, "extract", "Extracting...");
         let effective_src = if release.archive_ext == "dll" || release.archive_ext == "so" {
             // The archive *is* the deployable file, already sitting at
             // `temp_dir/{zip_name}` — which matches the deploy rel path.

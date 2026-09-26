@@ -279,6 +279,7 @@ pub fn extract_archive(archive_path: &Path, archive_ext: &str, dest: &Path) -> A
 }
 
 pub fn copy_dir_recursive(src: &Path, dest: &Path) -> Result<Vec<String>, String> {
+    std::fs::create_dir_all(dest).map_err(|e| format!("{}: {e}", dest.display()))?;
     let mut installed = Vec::new();
     copy_dir_inner(src, dest, dest, &mut installed)?;
     Ok(installed)
