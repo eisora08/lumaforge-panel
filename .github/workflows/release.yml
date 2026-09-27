@@ -23,6 +23,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'
@@ -60,18 +62,26 @@ jobs:
           releaseDraft: false
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}
 
-      # tauri-action cannot auto-generate notes, so append the standard
-      # "What's Changed" list (commits since the previous tag) afterwards.
+      # Auto-generated notes only list commits when PRs exist, so build the
+      # "What's Changed" list straight from git log and patch the release
+      # body afterwards. tauri-action has no auto-notes support.
       - name: Generate release notes
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') && matrix.platform == 'ubuntu-22.04'
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          notes=$(gh api "repos/${{ github.repository }}/releases/generate-notes" -f tag_name="${{ github.ref_name }}" --jq .body)
-          rel_id=$(gh api "repos/${{ github.repository }}/releases/tags/${{ github.ref_name }}" --jq .id)
+          tag="$GITHUB_REF_NAME"
+          prev="$(git describe --tags --abbrev=0 "${tag}^" 2>/dev/null || true)"
           {
             echo 'See the assets for download links.'
             echo
-            printf '%s\n' "$notes"
+            if [ -n "$prev" ]; then
+              echo "## What's Changed"
+              git log --no-merges --pretty='- `%h` %s' "${prev}..${tag}"
+              echo
+              echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${prev}...${tag}"
+            fi
           } > "${RUNNER_TEMP}/release-notes.md"
-          gh api -X PATCH "repos/${{ github.repository }}/releases/${rel_id}" -F "body@${RUNNER_TEMP}/release-notes.md"
+          rel_id=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" --jq .id)
+          gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${rel_id}" -F "body@${RUNNER_TEMP}/release-notes.md"
