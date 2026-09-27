@@ -103,7 +103,51 @@ fn sync_autostart(enabled: bool) -> Result<(), String> {
     Ok(())
 }
 
-#[cfg(not(target_os = "windows"))]
+/// Mirror the autostart setting into an XDG autostart entry (Linux only) —
+/// the equivalent of the Windows Run key.
+#[cfg(target_os = "linux")]
+fn sync_autostart(enabled: bool) -> Result<(), String> {
+    const ENTRY_NAME: &str = "lumaforge-panel.desktop";
+    const MARKER: &str = "Name=LumaForge Panel";
+
+    let entry_path = dirs::config_dir()
+        .ok_or_else(|| "Config directory not found".to_string())?
+        .join("autostart")
+        .join(ENTRY_NAME);
+
+    if enabled {
+        let exe_path = std::env::current_exe()
+            .map_err(|e| format!("Failed to get executable path: {e}"))?;
+        let content = format!(
+            "[Desktop Entry]\n\
+             Type=Application\n\
+             Name=LumaForge Panel\n\
+             Comment=LumaForge control panel\n\
+             Exec=\"{}\"\n\
+             Terminal=false\n\
+             X-GNOME-Autostart-enabled=true\n",
+            exe_path.display()
+        );
+        if let Some(parent) = entry_path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create autostart directory: {e}"))?;
+        }
+        std::fs::write(&entry_path, content)
+            .map_err(|e| format!("Failed to write autostart entry: {e}"))?;
+    } else if entry_path.exists() {
+        // Only delete the entry if it is ours.
+        let ours = std::fs::read_to_string(&entry_path)
+            .map(|c| c.contains(MARKER))
+            .unwrap_or(false);
+        if ours {
+            let _ = std::fs::remove_file(&entry_path);
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "linux")))]
 fn sync_autostart(_enabled: bool) -> Result<(), String> {
     Ok(())
 }

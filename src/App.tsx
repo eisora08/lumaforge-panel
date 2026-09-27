@@ -349,7 +349,7 @@ function Shell() {
 
                 <div className="menu-section-title">Startup</div>
                 <label className="menu-row" htmlFor="startup-windows">
-                  <span>Start with Windows</span>
+                  <span>Start automatically</span>
                   <button
                     id="startup-windows"
                     type="button"
