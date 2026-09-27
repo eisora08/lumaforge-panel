@@ -27,6 +27,22 @@ html, body {
   height: 100%;
 }
 
+/* No text selection anywhere — desktop app feel. */
+html,
+body,
+body * {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* …except native text entry fields. */
+input,
+textarea,
+[contenteditable='true'] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 button {
   font-family: inherit;
   font-size: inherit;
