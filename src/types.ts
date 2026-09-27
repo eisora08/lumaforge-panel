@@ -31,6 +31,8 @@ export interface PanelStatus {
   steamRoot: string | null;
   steam: SteamStatus;
   cdp: ComponentState;
+  /** File the CDP toggle renames, per-OS (e.g. `ubuntu12_32/liblumaforge.so`). */
+  cdpLoader: string;
   tools: ToolStatus[];
   runtimeInstalled: boolean;
   runtimeUpdateAvailable: boolean;

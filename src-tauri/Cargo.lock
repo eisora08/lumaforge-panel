@@ -2055,7 +2055,7 @@ checksum = "4050469837a6ff301cd14c1f8f24f88549e6d548f24f64e2148eb0f72cebc51f"
 
 [[package]]
 name = "lumaforge-panel"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2068,6 +2068,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-process",
  "tauri-plugin-updater",
+ "webkit2gtk-nvidia-quirk",
  "winreg 0.52.0",
  "zip 2.4.2",
 ]
@@ -4760,6 +4761,12 @@ dependencies = [
  "soup3",
  "webkit2gtk-sys",
 ]
+
+[[package]]
+name = "webkit2gtk-nvidia-quirk"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6e058d16abf0bb1973256d243ce7749f0e6821dd30d18cd9f3db42937090e8a"
 
 [[package]]
 name = "webkit2gtk-sys"

@@ -270,6 +270,7 @@ export function DashboardView() {
 
   const cdpState: ComponentState = status?.cdp ?? 'missing';
   const cdpBusy = busy === 'cdp';
+  const cdpLoader = status?.cdpLoader || 'wsock32.dll';
 
   const cdpStatusCopy = useMemo(() => {
     if (cdpBusy) {
@@ -294,8 +295,7 @@ export function DashboardView() {
       return {
         eyebrow: 'RUNTIME NOT INSTALLED',
         title: 'Install the LumaForge runtime',
-        description:
-          'The CDP injection DLLs are not present in the Steam directory yet.',
+        description: `${cdpLoader} is not present in the Steam directory yet.`,
         buttonLabel: 'INSTALL',
         description2: 'Download and install the runtime',
       };
@@ -304,8 +304,7 @@ export function DashboardView() {
       return {
         eyebrow: 'CDP INJECTION ACTIVE',
         title: 'LumaForge is running',
-        description:
-          'wsock32.dll is loaded by Steam and extensions are being injected.',
+        description: `${cdpLoader} is loaded by Steam and extensions are being injected.`,
         buttonLabel: 'ENABLED',
         description2: 'Disable CDP injection',
       };
@@ -313,12 +312,11 @@ export function DashboardView() {
     return {
       eyebrow: 'CDP INJECTION OFF',
       title: 'LumaForge is paused',
-      description:
-        'The loader is backed up as wsock32.dll.bak and Steam loads vanilla.',
+      description: `The loader is backed up as ${cdpLoader}.bak and Steam loads vanilla.`,
       buttonLabel: 'DISABLED',
       description2: 'Enable CDP injection',
     };
-  }, [cdpBusy, cdpState, loading, status]);
+  }, [cdpBusy, cdpLoader, cdpState, loading, status]);
 
   const heroState = cdpBusy
     ? 'busy'

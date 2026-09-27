@@ -218,6 +218,23 @@ pub fn find_tool(id: &str) -> Option<&'static ToolDef> {
 // Disk inspection
 // ---------------------------------------------------------------------------
 
+/// Pick the root that the declared relative paths resolve against.
+///
+/// Most releases wrap the payload in a single versioned folder that has to be
+/// stripped, but the CDP proxy's Linux archive puts its files in `ubuntu12_32/`
+/// — a directory that *is* part of the deploy path. Flattening that one makes
+/// `deploy` look for `ubuntu12_32/ubuntu12_32/liblumaforge.so`, so the
+/// Steam-root layout is resolved against the declared paths first and only
+/// falls back to flattening when they do not match.
+fn resolve_payload_root(def: &ToolDef, extract_dir: &Path) -> PathBuf {
+    if let DeployTarget::SteamRoot { files } = def.target {
+        if !files.is_empty() && files.iter().all(|rel| extract_dir.join(rel).exists()) {
+            return extract_dir.to_path_buf();
+        }
+    }
+    github::flatten_extracted_dir(extract_dir).unwrap_or_else(|| extract_dir.to_path_buf())
+}
+
 /// Resolve a declared relative path against `root`, tolerating archives that
 /// extracted the file flat instead of into its declared subdirectory
 /// (`bin/SLSsteam.so` vs `SLSsteam.so`).
@@ -482,7 +499,7 @@ fn deploy(app: &tauri::AppHandle, def: &ToolDef, src: &Path) -> Result<bool, Str
             let mut errors: Vec<String> = Vec::new();
 
             let copy_once = |rel: &str| -> Result<(), String> {
-                let from = src.join(rel);
+                let from = resolve_rel(src, rel);
                 if !from.exists() {
                     return Err(format!("{rel} not found in release"));
                 }
@@ -623,7 +640,7 @@ fn install_inner(
             let extract_dir = temp_dir.join("extracted");
             github::extract_archive(&archive_path, &release.archive_ext, &extract_dir)
                 .map_err(|e| format!("Extraction failed: {e}"))?;
-            github::flatten_extracted_dir(&extract_dir).unwrap_or(extract_dir)
+            resolve_payload_root(def, &extract_dir)
         };
 
         // Payload tools persist their files; everyone else deploys straight
@@ -654,3 +671,122 @@ fn install_inner(
     }
 }
 
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The CDP tool, using the per-OS file list this build ships.
+    fn cdp_def() -> ToolDef {
+        ToolDef {
+            id: "cdp-proxy",
+            name: "CDP Proxy",
+            description: "",
+            github_owner: "eisora08",
+            github_repo: "lumaforge-cdp-proxy",
+            preferred_asset: None,
+            preferred_asset_contains: None,
+            platform: Platform::All,
+            target: DeployTarget::SteamRoot { files: CDP_FILES },
+            toggle: CDP_TOGGLE,
+            installed: CDP_INSTALLED,
+            post_install: &[],
+        }
+    }
+
+    fn plugin_def() -> ToolDef {
+        ToolDef {
+            id: "steam-store-helper",
+            name: "steam-store-helper",
+            description: "",
+            github_owner: "eisora08",
+            github_repo: "lumaforge-extensions",
+            preferred_asset: None,
+            preferred_asset_contains: Some("steam-store-helper"),
+            platform: Platform::All,
+            target: DeployTarget::Plugins {
+                dir: "steam-store-helper",
+            },
+            toggle: &["steam-store-helper"],
+            installed: &["steam-store-helper"],
+            post_install: &[],
+        }
+    }
+
+    /// Fresh scratch directory, named after the test so parallel runs and
+    /// leftovers from a failed run cannot collide.
+    fn scratch(label: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("lumaforge-panel-{label}"));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn touch(path: &Path) {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, b"").unwrap();
+    }
+
+    /// The Linux release wraps its files in `ubuntu12_32/`, which is also the
+    /// deploy path — flattening it made `deploy` look for
+    /// `ubuntu12_32/ubuntu12_32/liblumaforge.so`.
+    #[test]
+    fn keeps_deploy_directory_that_is_part_of_the_rel_path() {
+        let extract_dir = scratch("layout-linux");
+        for rel in CDP_FILES {
+            touch(&extract_dir.join(rel));
+        }
+
+        assert_eq!(resolve_payload_root(&cdp_def(), &extract_dir), extract_dir);
+
+        std::fs::remove_dir_all(&extract_dir).unwrap();
+    }
+
+    /// Windows-style releases wrap everything in one versioned folder, which
+    /// still has to be stripped.
+    #[test]
+    fn strips_single_wrapper_directory() {
+        let extract_dir = scratch("layout-wrapped");
+        let inner = extract_dir.join("LumaForge-CDP-Proxy-v0.3.0");
+        for rel in ["wsock32.dll", "lumaforge/lumaforge.dll"] {
+            touch(&inner.join(rel));
+        }
+
+        assert_eq!(resolve_payload_root(&cdp_def(), &extract_dir), inner);
+
+        std::fs::remove_dir_all(&extract_dir).unwrap();
+    }
+
+    /// Plugin tools copy a whole directory, so the wrapper folder must always
+    /// be stripped regardless of the declared files.
+    #[test]
+    fn always_strips_wrapper_for_directory_targets() {
+        let extract_dir = scratch("layout-plugins");
+        let inner = extract_dir.join("steam-store-helper-2.6.0");
+        touch(&inner.join("manifest.json"));
+
+        assert_eq!(resolve_payload_root(&plugin_def(), &extract_dir), inner);
+
+        std::fs::remove_dir_all(&extract_dir).unwrap();
+    }
+
+    /// An archive that extracted a declared file flat instead of into its
+    /// subdirectory must still resolve, via `resolve_rel`.
+    #[test]
+    fn resolves_files_extracted_flat() {
+        let root = scratch("layout-flat");
+        let def = cdp_def();
+        let DeployTarget::SteamRoot { files } = def.target else {
+            unreachable!("cdp-proxy deploys to the Steam root");
+        };
+        for rel in files {
+            touch(&root.join(rel.rsplit('/').next().unwrap()));
+        }
+
+        for rel in files {
+            assert!(resolve_rel(&root, rel).exists(), "{rel} should resolve");
+        }
+
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+}

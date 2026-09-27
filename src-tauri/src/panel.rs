@@ -27,6 +27,9 @@ pub struct PanelStatus {
     pub steam_root: Option<String>,
     pub steam: steam::SteamStatus,
     pub cdp: String,
+    /// Primary file the CDP toggle renames — `wsock32.dll` on Windows,
+    /// `ubuntu12_32/liblumaforge.so` on Linux.
+    pub cdp_loader: String,
     pub tools: Vec<ToolStatus>,
     pub runtime_installed: bool,
     pub runtime_update_available: bool,
@@ -143,6 +146,10 @@ fn build_status() -> PanelStatus {
         steam_root: steam_root.map(|p| p.to_string_lossy().to_string()),
         steam: steam_status,
         cdp: cdp_state.as_str().to_string(),
+        cdp_loader: runtime
+            .and_then(|def| def.toggle.first().copied())
+            .unwrap_or_default()
+            .to_string(),
         tools: tool_statuses,
         runtime_installed,
         runtime_update_available,
