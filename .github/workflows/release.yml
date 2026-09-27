@@ -22,7 +22,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -37,7 +37,7 @@ jobs:
             libssl-dev \
             patchelf
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: lts/*
           cache: npm
@@ -84,4 +84,4 @@ jobs:
             fi
           } > "${RUNNER_TEMP}/release-notes.md"
           rel_id=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" --jq .id)
-          gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${rel_id}" -F "body@${RUNNER_TEMP}/release-notes.md"
+          gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${rel_id}" -F "body=@${RUNNER_TEMP}/release-notes.md"
