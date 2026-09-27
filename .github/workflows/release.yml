@@ -59,3 +59,19 @@ jobs:
           releaseBody: 'See the assets for download links.'
           releaseDraft: false
           prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}
+
+      # tauri-action cannot auto-generate notes, so append the standard
+      # "What's Changed" list (commits since the previous tag) afterwards.
+      - name: Generate release notes
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          notes=$(gh api "repos/${{ github.repository }}/releases/generate-notes" -f tag_name="${{ github.ref_name }}" --jq .body)
+          rel_id=$(gh api "repos/${{ github.repository }}/releases/tags/${{ github.ref_name }}" --jq .id)
+          {
+            echo 'See the assets for download links.'
+            echo
+            printf '%s\n' "$notes"
+          } > "${RUNNER_TEMP}/release-notes.md"
+          gh api -X PATCH "repos/${{ github.repository }}/releases/${rel_id}" -F "body@${RUNNER_TEMP}/release-notes.md"
