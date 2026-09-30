@@ -5,6 +5,7 @@ mod postinstall;
 mod settings;
 mod state;
 mod steam;
+mod themes;
 mod tools;
 mod tray;
 
@@ -45,6 +46,11 @@ pub fn run() {
             panel::get_app_version,
             panel::get_settings,
             panel::update_settings,
+            themes::themes_get,
+            themes::theme_activate,
+            themes::theme_deactivate,
+            themes::theme_set_condition,
+            themes::theme_reset_condition,
         ])
         .run(tauri::generate_context!())
         .expect("error while running lumaforge-panel");

@@ -76,3 +76,45 @@ export interface PartialSettings {
   startup?: Partial<StartupSettings>;
   appearance?: Partial<AppearanceSettings>;
 }
+
+// ---------------------------------------------------------------------------
+// Steam themes (skin.json themes managed through the CDP proxy runtime)
+// ---------------------------------------------------------------------------
+
+export interface ThemeSlider {
+  cssVariable: string;
+  min: number;
+  max: number;
+  step: number;
+  unit: string;
+}
+
+export interface ThemeCondition {
+  key: string;
+  description: string;
+  tab: string;
+  section: string;
+  default: unknown;
+  /** Dropdown option names; absent for slider conditions. */
+  values?: string[] | null;
+  slider?: ThemeSlider | null;
+  /** Persisted selection from active.json; undefined = theme default. */
+  selected?: string | null;
+}
+
+export interface ThemeInfo {
+  id: string;
+  name: string;
+  author: string;
+  description: string;
+  version: string;
+  tags: string[];
+  previewPath?: string | null;
+  conditions: ThemeCondition[];
+}
+
+export interface ThemesState {
+  /** Directory name of the active theme; empty = theming disabled. */
+  active: string;
+  themes: ThemeInfo[];
+}

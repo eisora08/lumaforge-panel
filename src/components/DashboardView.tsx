@@ -9,6 +9,7 @@ import {
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { ConfirmModal } from './ConfirmModal';
+import { ThemesCard } from './ThemesCard';
 import { useToast } from './Toast';
 import type {
   ComponentState,
@@ -25,8 +26,6 @@ import {
   Terminal,
   Cloud,
   Shield,
-  RefreshCw,
-  Download,
 } from 'lucide-react';
 
 type BusyKind = 'cdp' | 'tool' | 'steam' | null;
@@ -333,14 +332,7 @@ export function DashboardView() {
     [status]
   );
 
-  const runtimeNeeded = useMemo(() => {
-    if (!status) return false;
-    if (status.runtimeUpdateAvailable) return true;
-    return status.cdp === 'missing';
-  }, [status]);
-
-  const steamStatusText = useMemo(() => {
-    if (loading && !status) return 'Checking';
+  const steamStatusText = useMemo(() => {    if (loading && !status) return 'Checking';
     if (status?.steam.steamRunning) return 'Running';
     return 'Stopped';
   }, [status, loading]);
@@ -356,46 +348,6 @@ export function DashboardView() {
     <>
       <div className="view-content panel-dashboard">
         <main className="panel-column">
-          {runtimeNeeded && status && (
-            <section
-              className={`panel-banner ${
-                status.runtimeUpdateAvailable
-                  ? 'panel-banner--update'
-                  : 'panel-banner--install'
-              }`}
-            >
-              <span className="panel-banner-icon">
-                {status.runtimeUpdateAvailable ? (
-                  <RefreshCw size={16} aria-hidden="true" />
-                ) : (
-                  <Download size={16} aria-hidden="true" />
-                )}
-              </span>
-
-              <span className="panel-banner-copy">
-                <strong className="panel-banner-title">
-                  {status.runtimeUpdateAvailable
-                    ? 'Runtime update available'
-                    : 'LumaForge runtime required'}
-                </strong>
-                <span className="panel-banner-desc">
-                  {status.runtimeUpdateAvailable
-                    ? 'A newer release of the CDP proxy is published on GitHub.'
-                    : 'Installs the CDP proxy DLLs into Steam and the steam-store-helper plugin.'}
-                </span>
-              </span>
-
-              <button
-                type="button"
-                className="btn btn-primary btn-sm panel-banner-btn"
-                onClick={() => openInstallModal({ kind: 'install-runtime' })}
-                disabled={busy !== null || modal !== null}
-              >
-                {status.runtimeUpdateAvailable ? 'UPDATE' : 'INSTALL'}
-              </button>
-            </section>
-          )}
-
           <section
             className={`panel-hero panel-hero--${heroState}`}
             aria-label="CDP injection"
@@ -542,6 +494,8 @@ export function DashboardView() {
               );
             })}
           </section>
+
+          <ThemesCard cdpState={cdpState} />
 
           <div className="panel-footer">
             <span className="panel-footer-path">

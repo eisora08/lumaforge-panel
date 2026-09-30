@@ -255,6 +255,11 @@ function Shell() {
             <span className="app-header-title" data-tauri-drag-region>
               LumaForge
             </span>
+          </div>
+
+          <div className="header-spacer" data-tauri-drag-region />
+
+          <div className="header-right" data-tauri-drag-region>
             {updateCount > 0 && (
               <button
                 type="button"
@@ -272,11 +277,7 @@ function Shell() {
                 <span className="update-badge-count">{updateCount}</span>
               </button>
             )}
-          </div>
 
-          <div className="header-spacer" data-tauri-drag-region />
-
-          <div className="header-right" data-tauri-drag-region>
             <button
               type="button"
               className="window-btn window-btn-gear"
