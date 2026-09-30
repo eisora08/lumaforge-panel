@@ -2,10 +2,10 @@
 
 # LumaForge Panel
 
-**Minimal desktop dashboard for the LumaForge Steam runtime — one-click CDP control, component switches, and auto-updates.**
+**Minimal desktop dashboard for the LumaForge Steam runtime — one-click CDP control, component switches, Steam theme management, and auto-updates.**
 
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
-![Version](https://img.shields.io/badge/version-0.1.3-purple)
+![Version](https://img.shields.io/badge/version-0.2.0-purple)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20%7C%20Linux-0078d4)
 ![Rust](https://img.shields.io/badge/Rust-1.77+-orange?logo=rust)
 ![Tauri](https://img.shields.io/badge/Tauri-v2-FFC131?logo=tauri)
@@ -20,7 +20,7 @@
 
 ## Disclaimer
 
-LumaForge Panel is an **educational project** and a **technical demonstration** of modern desktop application development using Tauri v2, Rust, React, and TypeScript. The dashboard **is** the application: there are no library, downloads, or settings views — just component control for the LumaForge Steam runtime.
+LumaForge Panel is an **educational project** and a **technical demonstration** of modern desktop application development using Tauri v2, Rust, React, and TypeScript. The dashboard **is** the application: there are no library, downloads, or settings views — just component control for the LumaForge Steam runtime and management of the Steam themes it renders.
 
 **LumaForge Panel is not affiliated with, endorsed by, or connected to Valve Corporation, Steam, or any game publisher.** All trademarks belong to their respective owners.
 
@@ -34,6 +34,7 @@ This software is provided strictly for educational and demonstration purposes. U
 |---------|-------------|
 | **One-Click CDP Toggle** | Enable/disable the CDP proxy by renaming `wsock32.dll` ↔ `wsock32.dll.bak` in the Steam root, with automatic Steam shutdown and restart when needed |
 | **Component Switches** | Toggle `steam-store-helper`, OpenSteamTool, CloudRedirect and SLS Steam on/off via disk renames (`.bak`) — the proxy picks up the changes |
+| **Steam Theme Manager** | Browse installed Steam themes, activate/deactivate them live (no restart), and edit per-condition overrides (dropdowns, sliders, colors) with a Millennium-style editor |
 | **Install/Update Banner** | One-click download of the runtime and tools from GitHub Releases, with live deploy progress |
 | **Disk-Derived State** | Every component status is read straight from disk (`.dll` vs `.bak`) — no configuration to go stale |
 | **Steam Integration** | Detects the Steam install and running state; start or restart Steam from the dashboard |
@@ -96,6 +97,7 @@ lumaforge-panel/
 ├── src/                          # Frontend (React + TypeScript)
 │   ├── components/
 │   │   ├── DashboardView.tsx     # The whole app: hero, switches, banner, updates
+│   │   ├── ThemesCard.tsx        # Steam theme picker, activate/deactivate, conditions editor
 │   │   ├── ConfirmModal.tsx      # Destructive-action / install confirmations
 │   │   └── Toast.tsx             # Toast notifications
 │   ├── App.tsx                   # Shell: menus, settings popup, updater checks
@@ -108,6 +110,7 @@ lumaforge-panel/
 │   │   ├── github.rs             # GitHub Releases client (24 h cache)
 │   │   ├── steam.rs              # Steam detection / start / restart
 │   │   ├── settings.rs           # App preferences (+ HKCU autostart)
+│   │   ├── themes.rs             # Steam theme list / activate / conditions commands
 │   │   ├── tray.rs               # System tray menu
 │   │   └── postinstall.rs        # Per-tool setup hooks (e.g. SLS Steam)
 │   └── tauri.conf.json           # Tauri configuration (updater, NSIS)
