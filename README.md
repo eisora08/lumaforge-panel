@@ -5,7 +5,7 @@
 **Minimal desktop dashboard for the LumaForge Steam runtime — one-click CDP control, component switches, Steam theme management, and auto-updates.**
 
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
-![Version](https://img.shields.io/badge/version-0.2.0-purple)
+![Version](https://img.shields.io/github/v/release/eisora08/lumaforge-panel?label=version&color=purple)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11%20%7C%20Linux-0078d4)
 ![Rust](https://img.shields.io/badge/Rust-1.77+-orange?logo=rust)
 ![Tauri](https://img.shields.io/badge/Tauri-v2-FFC131?logo=tauri)
@@ -37,9 +37,14 @@ This software is provided strictly for educational and demonstration purposes. U
 | **Steam Theme Manager** | Browse installed Steam themes, activate/deactivate them live (no restart), and edit per-condition overrides (dropdowns, sliders, colors) with a Millennium-style editor |
 | **Install/Update Banner** | One-click download of the runtime and tools from GitHub Releases, with live deploy progress |
 | **Disk-Derived State** | Every component status is read straight from disk (`.dll` vs `.bak`) — no configuration to go stale |
+| **Spanish / English UI** | Full UI localization with automatic language detection on first run and a manual selector in Settings |
 | **Steam Integration** | Detects the Steam install and running state; start or restart Steam from the dashboard |
+| **Per-Component Uninstall** | Remove a single component from its row (DLLs + `.bak` backups) while keeping its config and data intact |
+| **Open App Data Folder** | Titlebar button that opens the LumaForge app-data directory |
 | **System Tray** | Close-to-tray with Open/Quit menu |
-| **Startup & Appearance** | Start with Windows, start minimized, close to tray, theme selection |
+| **Single Instance** | Relaunching the app shows and focuses the existing window instead of opening a second one |
+| **Resizable Window** | Resizable down to 720×520; size and position persist across sessions and are clamped to the monitor work area |
+| **Startup & Appearance** | Start with Windows, start minimized, close to tray, theme and language selection |
 | **Auto-Updates** | Signed updater (NSIS) with in-app update notifications |
 | **Live Update Badge** | Checks GitHub for newer runtime/tool versions and flags them in the UI |
 

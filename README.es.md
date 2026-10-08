@@ -2,10 +2,10 @@
 
 # LumaForge Panel
 
-**Panel de escritorio minimalista para el runtime de Steam de LumaForge — control CDP con un clic, switches de componentes y auto-actualizaciones.**
+**Panel de escritorio minimalista para el runtime de Steam de LumaForge — control CDP con un clic, switches de componentes, gestion de temas de Steam y auto-actualizaciones.**
 
 ![Licencia](https://img.shields.io/badge/licencia-GPL--3.0-blue)
-![Version](https://img.shields.io/badge/version-0.1.3-purple)
+![Version](https://img.shields.io/github/v/release/eisora08/lumaforge-panel?label=version&color=purple)
 ![Plataforma](https://img.shields.io/badge/plataforma-Windows%2010%2F11%20%7C%20Linux-0078d4)
 ![Rust](https://img.shields.io/badge/Rust-1.77+-orange?logo=rust)
 ![Tauri](https://img.shields.io/badge/Tauri-v2-FFC131?logo=tauri)
@@ -34,11 +34,17 @@ Este software se proporciona estrictamente con fines educativos y de demostracio
 |----------------|-------------|
 | **Toggle CDP con un clic** | Activa/desactiva el proxy CDP renombrando `wsock32.dll` ↔ `wsock32.dll.bak` en la raiz de Steam, con apagado y reinicio automaticos de Steam cuando hace falta |
 | **Switches de componentes** | Activa/desactiva `steam-store-helper`, OpenSteamTool, CloudRedirect y SLS Steam mediante renombres en disco (`.bak`) — el proxy recoge los cambios |
+| **Gestion de temas de Steam** | Explora los temas instalados, activalos/desactivalos en vivo (sin reinicio) y edita ajustes por condicion (dropdowns, sliders, colores) con un editor estilo Millennium |
 | **Banner de Install/Update** | Descarga con un clic del runtime y herramientas desde GitHub Releases, con progreso de despliegue en vivo |
 | **Estado derivado del disco** | Cada estado de componente se lee directamente del disco (`.dll` vs `.bak`) — sin configuracion que se desactualice |
+| **UI en espanol / ingles** | Interfaz completamente localizada, con deteccion automatica del idioma en el primer arranque y selector manual en Ajustes |
 | **Integracion con Steam** | Detecta la instalacion y el estado de Steam; inicia o reinicia Steam desde el panel |
+| **Desinstalacion por componente** | Elimina un componente individual desde su fila (DLLs + copias `.bak`) conservando su configuracion y datos |
+| **Abrir carpeta de datos** | Boton en la barra de titulo que abre el directorio de datos de LumaForge |
 | **System Tray** | Cierra a la bandeja con menu Abrir/Salir |
-| **Inicio y apariencia** | Arranque con Windows, arranque minimizado, cerrar a la bandeja, seleccion de tema |
+| **Instancia unica** | Al volver a lanzar la app se muestra y enfoca la ventana existente en vez de abrir una segunda |
+| **Ventana redimensionable** | Redimensionable hasta 720×520; el tamano y la posicion persisten entre sesiones y se ajustan al area de trabajo del monitor |
+| **Inicio y apariencia** | Arranque con Windows, arranque minimizado, cerrar a la bandeja, seleccion de tema e idioma |
 | **Actualizaciones automaticas** | Actualizador firmado (NSIS) con notificaciones dentro de la app |
 | **Insignia de actualizaciones** | Consulta GitHub buscando versiones nuevas del runtime/herramientas y las senala en la UI |
 
