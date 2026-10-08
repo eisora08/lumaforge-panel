@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { X, CheckCircle2, AlertTriangle, Info, CircleX } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -62,6 +63,7 @@ const DEFAULT_DURATION: Record<ToastType, number> = {
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const idRef = useRef(0);
   const timersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
@@ -126,7 +128,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={contextValue}>
       {children}
       {createPortal(
-        <div className="toast-container" aria-live="polite" aria-label="Notifications">
+        <div
+          className="toast-container"
+          aria-live="polite"
+          aria-label={t('aria.notifications')}
+        >
           {toasts.map((t) => (
             <ToastItemComponent
               key={t.id}
@@ -165,6 +171,8 @@ function ToastItemComponent({
   toast: ToastItem;
   onDismiss: () => void;
 }) {
+  const { t } = useI18n();
+
   return (
     <div
       className={[
@@ -182,7 +190,7 @@ function ToastItemComponent({
         type="button"
         className="toast-dismiss"
         onClick={onDismiss}
-        aria-label="Dismiss notification"
+        aria-label={t('aria.dismissNotification')}
       >
         <X size={13} />
       </button>

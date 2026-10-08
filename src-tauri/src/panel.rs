@@ -168,7 +168,7 @@ fn status_blocking() -> Result<PanelStatus, String> {
 pub async fn panel_status() -> Result<PanelStatus, String> {
     tauri::async_runtime::spawn_blocking(status_blocking)
         .await
-        .map_err(|e| format!("Status task failed: {e}"))?
+        .map_err(|e| crate::i18n::t("err.status_task", &[&e.to_string()]))?
 }
 
 /// Clear the GitHub cache and re-read the latest releases.
@@ -179,7 +179,7 @@ pub async fn check_updates() -> Result<PanelStatus, String> {
         build_status()
     })
     .await
-    .map_err(|e| format!("Update check failed: {e}"))
+    .map_err(|e| crate::i18n::t("err.update_check", &[&e.to_string()]))
 }
 
 /// Big CDP switch: rename `wsock32.dll` <-> `wsock32.dll.bak`.
@@ -190,12 +190,12 @@ pub async fn cdp_set_enabled(
 ) -> Result<PanelResult, String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
         let Some(def) = tools::find_tool("cdp-proxy") else {
-            return Err("CDP proxy definition not found.".to_string());
+            return Err(crate::i18n::t("err.cdp_def_missing", &[]));
         };
         tools::set_enabled(&app, def, enabled)
     })
     .await
-    .map_err(|e| format!("CDP toggle failed: {e}"))?;
+    .map_err(|e| crate::i18n::t("err.cdp_toggle", &[&e.to_string()]))?;
 
     match result {
         Ok((message, restart_required)) => Ok(ok(message, restart_required)),
@@ -213,11 +213,11 @@ pub async fn set_tool_enabled(
 ) -> Result<PanelResult, String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
         let def = tools::find_tool(&tool_id)
-            .ok_or_else(|| format!("Unknown tool: {tool_id}"))?;
+            .ok_or_else(|| crate::i18n::t("err.unknown_tool", &[&tool_id]))?;
         tools::set_enabled(&app, def, enabled)
     })
     .await
-    .map_err(|e| format!("Tool toggle failed: {e}"))?;
+    .map_err(|e| crate::i18n::t("err.tool_toggle", &[&e.to_string()]))?;
 
     match result {
         Ok((message, restart_required)) => Ok(ok(message, restart_required)),
@@ -256,7 +256,7 @@ pub async fn install_runtime(app: tauri::AppHandle) -> Result<PanelResult, Strin
         }
     })
     .await
-    .map_err(|e| format!("Runtime install failed: {e}"))?;
+    .map_err(|e| crate::i18n::t("err.runtime_install", &[&e.to_string()]))?;
 
     match result {
         Ok((message, restart_required)) => Ok(ok(message, restart_required)),
@@ -268,26 +268,47 @@ pub async fn install_runtime(app: tauri::AppHandle) -> Result<PanelResult, Strin
 pub async fn get_steam_status() -> Result<steam::SteamStatus, String> {
     tauri::async_runtime::spawn_blocking(steam::current_status)
         .await
-        .map_err(|e| format!("Steam status task failed: {e}"))
+        .map_err(|e| crate::i18n::t("err.steam_status_task", &[&e.to_string()]))
 }
 
 #[tauri::command]
 pub async fn start_steam() -> Result<steam::SteamOpResult, String> {
     tauri::async_runtime::spawn_blocking(steam::start_steam)
         .await
-        .map_err(|e| format!("Steam start task failed: {e}"))
+        .map_err(|e| crate::i18n::t("err.steam_start_task", &[&e.to_string()]))
 }
 
 #[tauri::command]
 pub async fn restart_steam() -> Result<steam::SteamOpResult, String> {
     tauri::async_runtime::spawn_blocking(steam::restart_steam)
         .await
-        .map_err(|e| format!("Steam restart task failed: {e}"))
+        .map_err(|e| crate::i18n::t("err.steam_restart_task", &[&e.to_string()]))
 }
 
 #[tauri::command]
 pub fn get_app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
+}
+
+/// Reveal the LumaForge data directory (`{local_data}/LumaForge`) in the
+/// file manager — the folder button in the titlebar.
+#[tauri::command]
+pub fn open_app_data_dir() -> Result<(), String> {
+    let dir = paths::app_data_dir();
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("{}", crate::i18n::t("err.create_dir", &[&dir.display().to_string(), &e.to_string()])))?;
+
+    #[cfg(target_os = "windows")]
+    let status = std::process::Command::new("explorer")
+        .arg(&dir)
+        .spawn();
+
+    #[cfg(target_os = "linux")]
+    let status = std::process::Command::new("xdg-open")
+        .arg(&dir)
+        .spawn();
+
+    status.map(|_| ()).map_err(|e| format!("{}", crate::i18n::t("err.open", &[&dir.display().to_string(), &e.to_string()])))
 }
 
 // ---------------------------------------------------------------------------
@@ -315,11 +336,29 @@ pub fn update_settings(
 pub async fn install_tool(app: tauri::AppHandle, tool_id: String) -> Result<PanelResult, String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
         let def = tools::find_tool(&tool_id)
-            .ok_or_else(|| format!("Unknown tool: {tool_id}"))?;
+            .ok_or_else(|| crate::i18n::t("err.unknown_tool", &[&tool_id]))?;
         tools::install(&app, def, true)
     })
     .await
-    .map_err(|e| format!("Install failed: {e}"))?;
+    .map_err(|e| crate::i18n::t("err.install", &[&e.to_string()]))?;
+
+    match result {
+        Ok((message, restart_required)) => Ok(ok(message, restart_required)),
+        Err(e) => Ok(err(e)),
+    }
+}
+
+/// Remove everything a tool deployed (files, state entry) — the per-row
+/// uninstall button on the dashboard.
+#[tauri::command]
+pub async fn uninstall_tool(tool_id: String) -> Result<PanelResult, String> {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let def = tools::find_tool(&tool_id)
+            .ok_or_else(|| crate::i18n::t("err.unknown_tool", &[&tool_id]))?;
+        tools::uninstall(def)
+    })
+    .await
+    .map_err(|e| crate::i18n::t("err.uninstall", &[&e.to_string()]))?;
 
     match result {
         Ok((message, restart_required)) => Ok(ok(message, restart_required)),

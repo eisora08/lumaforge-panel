@@ -74,3 +74,10 @@ pub fn set_enabled(tool_id: &str, enabled: bool) -> Result<(), String> {
     entry.enabled = enabled;
     save_state(&state)
 }
+
+/// Drop the entry for `tool_id` entirely (uninstall), keeping the rest.
+pub fn remove_tool(tool_id: &str) -> Result<(), String> {
+    let mut state = load_state();
+    state.tools.remove(tool_id);
+    save_state(&state)
+}

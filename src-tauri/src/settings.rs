@@ -1,3 +1,5 @@
+use std::sync::Mutex;
+
 use serde::{Deserialize, Serialize};
 
 use crate::paths;
@@ -25,11 +27,37 @@ impl Default for AppearanceSettings {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct WindowGeometry {
+    /// Logical width/height (DPI-independent).
+    pub width: f64,
+    pub height: f64,
+    /// Physical screen coordinates (exact across mixed-DPI monitors).
+    pub x: i32,
+    pub y: i32,
+}
+
+impl Default for WindowGeometry {
+    fn default() -> Self {
+        Self {
+            width: 900.0,
+            height: 810.0,
+            x: 0,
+            y: 0,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct PanelSettings {
     pub startup: StartupSettings,
     pub appearance: AppearanceSettings,
+    /// UI language: `"en"`, `"es"` or `""` (auto-detect on first run).
+    pub language: String,
+    /// Last window geometry; `None` on first run → default 900x810 centered.
+    pub window: Option<WindowGeometry>,
 }
 
 /// Partial update received from the frontend (only the provided fields change).
@@ -38,6 +66,7 @@ pub struct PanelSettings {
 pub struct PartialSettings {
     pub startup: Option<PartialStartup>,
     pub appearance: Option<PartialAppearance>,
+    pub language: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -74,6 +103,87 @@ fn save(settings: &PanelSettings) -> Result<(), String> {
     let json = serde_json::to_string_pretty(settings)
         .map_err(|e| format!("Failed to serialize settings: {e}"))?;
     paths::atomic_write(&settings_path(), &json)
+}
+
+static PENDING_GEOMETRY: Mutex<Option<WindowGeometry>> = Mutex::new(None);
+
+/// Snapshot the live geometry of `window` into the exit-time cache. Called for
+/// every `Moved`/`Resized` event so the position survives window destruction.
+pub fn capture_geometry(window: &tauri::Window<tauri::Wry>, event: &tauri::WindowEvent) {
+    match event {
+        tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {}
+        _ => return,
+    }
+    if window.label() != "main" || window.is_minimized().unwrap_or(true) {
+        return;
+    }
+    let Ok(position) = window.outer_position() else { return; };
+    let Ok(size) = window.outer_size() else { return; };
+    if size.width == 0 || size.height == 0 {
+        return;
+    }
+    if position.x < -10_000 || position.y < -10_000 {
+        return;
+    }
+    let scale = window.scale_factor().unwrap_or(1.0);
+    let geometry = WindowGeometry {
+        width: size.width as f64 / scale,
+        height: size.height as f64 / scale,
+        x: position.x,
+        y: position.y,
+    };
+    if let Ok(mut pending) = PENDING_GEOMETRY.lock() {
+        *pending = Some(geometry);
+    }
+}
+
+/// Persist the cached geometry if it differs from the saved one. Fired on
+/// `ExitRequested` and again on `Exit`; the second call is a no-op.
+pub fn flush_geometry() {
+    let geometry = match PENDING_GEOMETRY.lock() {
+        Ok(mut pending) => pending.take(),
+        Err(_) => return,
+    };
+    let Some(geometry) = geometry else { return; };
+    let mut settings = load();
+    if settings.window.as_ref() == Some(&geometry) {
+        return;
+    }
+    settings.window = Some(geometry);
+    let _ = save(&settings);
+}
+
+/// Clamp a desired logical window size into a physical work area, leaving a
+/// 16px logical margin per side. The UI minimum wins when it still fits,
+/// otherwise the work area wins (tiny screens).
+pub fn clamp_size(
+    desired_w: f64,
+    desired_h: f64,
+    work_w: u32,
+    work_h: u32,
+    scale: f64,
+    min_w: f64,
+    min_h: f64,
+) -> (f64, f64) {
+    let scale = if scale.is_finite() && scale > 0.0 { scale } else { 1.0 };
+    let max_w = ((work_w as f64 / scale) - 32.0).max(1.0);
+    let max_h = ((work_h as f64 / scale) - 32.0).max(1.0);
+    let mut w = desired_w.min(max_w);
+    let mut h = desired_h.min(max_h);
+    if w < min_w && min_w <= max_w {
+        w = min_w;
+    }
+    if h < min_h && min_h <= max_h {
+        h = min_h;
+    }
+    (w.max(1.0), h.max(1.0))
+}
+
+pub fn point_in_rect(x: i32, y: i32, rx: i32, ry: i32, rw: u32, rh: u32) -> bool {
+    x >= rx
+        && y >= ry
+        && (x as i64) < rx as i64 + rw as i64
+        && (y as i64) < ry as i64 + rh as i64
 }
 
 /// Mirror `start_with_windows` into the HKCU Run key (Windows only).
@@ -179,10 +289,62 @@ pub fn update_settings(partial: PartialSettings) -> Result<PanelSettings, String
         }
     }
 
+    if let Some(language) = partial.language {
+        settings.language = language;
+        crate::i18n::init_from_settings(&settings.language);
+    }
+
     if let Some(enabled) = autostart_changed {
         sync_autostart(enabled)?;
     }
 
     save(&settings)?;
     Ok(settings)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn clamp_keeps_default_on_large_screen() {
+        let (w, h) = clamp_size(900.0, 810.0, 1920, 1032, 1.0, 720.0, 520.0);
+        assert_eq!((w, h), (900.0, 810.0));
+    }
+
+    #[test]
+    fn clamp_shrinks_height_to_work_area() {
+        let (w, h) = clamp_size(900.0, 810.0, 1366, 720, 1.0, 720.0, 520.0);
+        assert_eq!(w, 900.0);
+        assert_eq!(h, 688.0);
+    }
+
+    #[test]
+    fn clamp_applies_physical_margin_on_hidpi() {
+        let (w, h) = clamp_size(900.0, 810.0, 2560, 1440, 2.0, 720.0, 520.0);
+        assert_eq!(w, 900.0);
+        assert_eq!(h, 688.0);
+    }
+
+    #[test]
+    fn clamp_upsizes_to_ui_minimum() {
+        let (w, h) = clamp_size(300.0, 200.0, 1920, 1032, 1.0, 720.0, 520.0);
+        assert_eq!((w, h), (720.0, 520.0));
+    }
+
+    #[test]
+    fn clamp_accepts_sub_min_when_work_area_is_smaller() {
+        let (w, h) = clamp_size(900.0, 810.0, 700, 500, 1.0, 720.0, 520.0);
+        assert_eq!(w, 668.0);
+        assert_eq!(h, 468.0);
+    }
+
+    #[test]
+    fn point_in_rect_detects_hits_and_misses() {
+        assert!(point_in_rect(100, 100, 0, 0, 1920, 1040));
+        assert!(point_in_rect(5000, 5000, 4000, 4000, 1920, 1040));
+        assert!(!point_in_rect(-32000, -32000, 0, 0, 1920, 1040));
+        assert!(!point_in_rect(1920, 0, 0, 0, 1920, 1040));
+        assert!(!point_in_rect(0, 1040, 0, 0, 1920, 1040));
+    }
 }

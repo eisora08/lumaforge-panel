@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { useToast } from './Toast';
+import { hasLaunchHint, useI18n } from '../i18n';
 import {
   ChevronLeft,
   ChevronRight,
@@ -16,8 +17,6 @@ import type {
   ThemeCondition,
   ThemesState,
 } from '../types';
-
-const HINT = ' — restart Steam if it doesn\u2019t look right';
 
 interface ThemesCardProps {
   cdpState: ComponentState;
@@ -40,6 +39,7 @@ function conditionValue(condition: ThemeCondition): string {
 
 export function ThemesCard({ cdpState }: ThemesCardProps) {
   const toast = useToast();
+  const { t } = useI18n();
 
   const [state, setState] = useState<ThemesState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,9 +96,11 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
         if (result.ok) {
           if (!opts?.silent) {
             const needsHint =
-              opts?.hint && !/launches/i.test(result.message);
+              opts?.hint && !hasLaunchHint(result.message);
             toast.success(
-              needsHint ? `${result.message}${HINT}` : result.message
+              needsHint
+                ? `${result.message}${t('themes.hint')}`
+                : result.message
             );
           }
         } else {
@@ -124,12 +126,39 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
   const count = state?.themes.length ?? 0;
   const themingOn = (state?.active ?? '') !== '';
 
+  // Track the rail scroll bounds so the arrow buttons disable at each end.
+  const [railEnds, setRailEnds] = useState({ start: true, end: true });
+
+  useEffect(() => {
+    const el = railRef.current;
+    if (!el) {
+      return;
+    }
+    const update = () => {
+      const max = el.scrollWidth - el.clientWidth;
+      setRailEnds({
+        start: el.scrollLeft <= 1,
+        end: max <= 0 || el.scrollLeft >= max - 1,
+      });
+    };
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    window.addEventListener('resize', update);
+    return () => {
+      el.removeEventListener('scroll', update);
+      observer.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, [count]);
+
   const conditionGroups = useMemo(() => {
     if (!selectedTheme) return [] as { label: string; items: ThemeCondition[] }[];
     const groups = new Map<string, ThemeCondition[]>();
     for (const condition of selectedTheme.conditions) {
       const parts = [condition.tab, condition.section].filter(Boolean);
-      const label = parts.length > 0 ? parts.join(' / ') : 'Conditions';
+      const label = parts.length > 0 ? parts.join(' / ') : t('themes.conditionsLabel');
       const list = groups.get(label) ?? [];
       list.push(condition);
       groups.set(label, list);
@@ -138,7 +167,7 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
       label,
       items,
     }));
-  }, [selectedTheme]);
+  }, [selectedTheme, t]);
 
   const handleMasterToggle = useCallback(async () => {
     if (busy || !state) return;
@@ -150,7 +179,7 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
     }
     const target = selectedId ?? state.themes[0]?.id;
     if (!target) {
-      toast.info('No themes installed');
+      toast.info(t('themes.noInstalled'));
       return;
     }
     await run(() => invoke<PanelResult>('theme_activate', { id: target }), {
@@ -239,27 +268,57 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
 
   return (
     <>
-      <section className="panel-themes" aria-label="Themes">
+      <section className="panel-themes" aria-label={t('themes.title')}>
       <div className="panel-themes-head">
         <span className="panel-component-icon" aria-hidden="true">
           <Palette size={16} />
         </span>
 
-        <strong className="panel-component-name">Themes</strong>
+        <strong className="panel-component-name">{t('themes.title')}</strong>
 
         {loading ? (
-          <span className="status-tag status-label">LOADING</span>
+          <span className="status-tag status-label">{t('themes.loadingTag')}</span>
         ) : themingOn && activeTheme ? (
           <span className="status-tag status-ok">{activeTheme.name}</span>
         ) : (
-          <span className="status-tag status-label">OFF</span>
+          <span className="status-tag status-label">{t('themes.offTag')}</span>
         )}
 
         <span className="panel-themes-count">
-          {count} installed
+          {t('themes.count', [count])}
         </span>
 
         <div className="panel-themes-head-actions">
+          <button
+            type="button"
+            className="btn btn-primary btn-sm panel-themes-apply"
+            onClick={() => {
+              void handleActivate();
+            }}
+            disabled={
+              busy ||
+              loading ||
+              !selectedTheme ||
+              selectedTheme.id === state?.active
+            }
+          >
+            {selectedTheme && selectedTheme.id === state?.active
+              ? t('themes.activeBtn')
+              : t('themes.applyBtn')}
+          </button>
+
+          <button
+            type="button"
+            className="panel-themes-icon-btn"
+            onClick={() => setPanelOpen(true)}
+            disabled={loading || !selectedTheme}
+            aria-label={t('aria.themeSettings')}
+            aria-expanded={panelOpen}
+            title={t('aria.themeSettings')}
+          >
+            <SlidersHorizontal size={13} aria-hidden="true" />
+          </button>
+
           <button
             type="button"
             className="panel-themes-icon-btn"
@@ -267,8 +326,8 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
               void refresh();
             }}
             disabled={loading || busy}
-            aria-label="Refresh themes"
-            title="Refresh"
+            aria-label={t('aria.refreshThemes')}
+            title={t('ui.refresh')}
           >
             <RefreshCw size={13} aria-hidden="true" />
           </button>
@@ -278,7 +337,7 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
             className="toggle panel-themes-toggle"
             role="switch"
             aria-checked={themingOn}
-            aria-label={themingOn ? 'Disable theming' : 'Enable theming'}
+            aria-label={themingOn ? t('aria.disableTheming') : t('aria.enableTheming')}
             aria-busy={busy}
             disabled={busy || loading}
             onClick={() => {
@@ -292,16 +351,16 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
 
       {showCdpHint && !loading && (
         <p className="panel-themes-note">
-          CDP injection is off — enable it so theme changes reach Steam live.
+          {t('themes.cdpNote')}
         </p>
       )}
 
       {loading ? (
-        <div className="panel-themes-empty">Loading themes…</div>
+        <div className="panel-themes-empty">{t('themes.loadingMsg')}</div>
       ) : count === 0 ? (
         <div className="panel-themes-empty">
-          No Steam themes found. Install themes into{' '}
-          <code>LumaForge/themes</code>.
+          {t('themes.emptyBefore')}{' '}
+          <code>LumaForge/themes</code>{t('themes.emptyAfter')}
         </div>
       ) : (
         <>
@@ -310,7 +369,8 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
               type="button"
               className="panel-themes-rail-btn"
               onClick={() => scrollRail(-1)}
-              aria-label="Scroll themes left"
+              disabled={railEnds.start}
+              aria-label={t('aria.scrollLeft')}
             >
               <ChevronLeft size={14} aria-hidden="true" />
             </button>
@@ -356,7 +416,7 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
                         </span>
                       )}
                       {isActive && (
-                        <span className="panel-theme-card-badge">Active</span>
+                        <span className="panel-theme-card-badge">{t('themes.activeBadge')}</span>
                       )}
                     </span>
 
@@ -377,63 +437,12 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
               type="button"
               className="panel-themes-rail-btn"
               onClick={() => scrollRail(1)}
-              aria-label="Scroll themes right"
+              disabled={railEnds.end}
+              aria-label={t('aria.scrollRight')}
             >
               <ChevronRight size={14} aria-hidden="true" />
             </button>
           </div>
-
-          {selectedTheme && (
-            <div className="panel-themes-detail">
-              <div className="panel-themes-detail-head">
-                <div className="panel-themes-detail-copy">
-                  <span className="panel-themes-detail-title">
-                    {selectedTheme.name}
-                    {selectedTheme.id === state?.active && (
-                      <span className="status-tag status-ok panel-themes-detail-chip">
-                        ACTIVE
-                      </span>
-                    )}
-                  </span>
-                  <span className="panel-themes-detail-sub">
-                    {[
-                      selectedTheme.author ? `by ${selectedTheme.author}` : '',
-                      selectedTheme.description,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ') || 'No description'}
-                  </span>
-                </div>
-
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  onClick={() => {
-                    void handleActivate();
-                  }}
-                  disabled={
-                    busy ||
-                    loading ||
-                    selectedTheme.id === state?.active
-                  }
-                >
-                  {selectedTheme.id === state?.active ? 'ACTIVE' : 'APPLY'}
-                </button>
-
-                <button
-                  type="button"
-                  className="panel-themes-icon-btn panel-themes-gear"
-                  onClick={() => setPanelOpen(true)}
-                  disabled={loading}
-                  aria-label="Theme settings"
-                  aria-expanded={panelOpen}
-                  title="Theme settings"
-                >
-                  <SlidersHorizontal size={13} aria-hidden="true" />
-                </button>
-              </div>
-            </div>
-          )}
         </>
       )}
       </section>
@@ -450,7 +459,7 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
             className="theme-panel"
             role="dialog"
             aria-modal="true"
-            aria-label={`Theme settings — ${selectedTheme.name}`}
+            aria-label={`${t('aria.themeSettings')} — ${selectedTheme.name}`}
           >
             <header className="theme-panel-head">
               <span className="panel-component-icon" aria-hidden="true">
@@ -460,10 +469,12 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
                 <strong>{selectedTheme.name}</strong>
                 <span>
                   {selectedTheme.id === state?.active
-                    ? 'Active theme'
-                    : 'Theme settings'}
+                    ? t('panel.activeTheme')
+                    : t('panel.settings')}
                   {conditionGroups.length > 0
-                    ? ` · ${selectedTheme.conditions.length} conditions`
+                    ? t('panel.conditionsCount', [
+                        selectedTheme.conditions.length,
+                      ])
                     : ''}
                 </span>
               </div>
@@ -471,8 +482,8 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
                 type="button"
                 className="panel-themes-icon-btn"
                 onClick={() => setPanelOpen(false)}
-                aria-label="Close theme settings"
-                title="Close (Esc)"
+                aria-label={t('aria.closeThemeSettings')}
+                title={t('panel.closeEsc')}
               >
                 <X size={13} aria-hidden="true" />
               </button>
@@ -487,7 +498,7 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
 
               {conditionGroups.length === 0 ? (
                 <p className="panel-themes-empty">
-                  This theme has no configurable conditions.
+                  {t('panel.noConditions')}
                 </p>
               ) : (
                 <div className="panel-themes-conditions">
@@ -552,8 +563,8 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
                                     handleResetCondition(condition)
                                   }
                                   disabled={busy}
-                                  aria-label={`Reset ${condition.key}`}
-                                  title="Reset to theme default"
+                                  aria-label={t('aria.resetCondition', [condition.key])}
+                                  title={t('resetToDefault')}
                                 >
                                   <RotateCcw size={12} aria-hidden="true" />
                                 </button>
@@ -598,8 +609,10 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
                                   handleResetCondition(condition)
                                 }
                                 disabled={busy}
-                                aria-label={`Reset ${condition.key}`}
-                                title="Reset to theme default"
+                                aria-label={t('aria.resetCondition', [
+                                  condition.key,
+                                ])}
+                                title={t('resetToDefault')}
                               >
                                 <RotateCcw size={12} aria-hidden="true" />
                               </button>
@@ -614,13 +627,13 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
             </div>
 
             <footer className="theme-panel-foot">
-              <span>Changes apply live — restart Steam if it doesn’t look right.</span>
+              <span>{t('panel.footer')}</span>
               <button
                 type="button"
                 className="btn btn-secondary btn-sm"
                 onClick={() => setPanelOpen(false)}
               >
-                DONE
+                {t('ui.done')}
               </button>
             </footer>
           </aside>

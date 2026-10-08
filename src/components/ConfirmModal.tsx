@@ -15,6 +15,7 @@ import {
   TriangleAlert,
   X,
 } from 'lucide-react';
+import { useI18n } from '../i18n';
 
 export type ConfirmModalTone =
   | 'default'
@@ -86,9 +87,9 @@ export function ConfirmModal({
   title,
   description,
   warning,
-  confirmLabel = 'CONFIRM',
-  cancelLabel = 'CANCEL',
-  busyLabel = 'PLEASE WAIT...',
+  confirmLabel,
+  cancelLabel,
+  busyLabel,
   tone = 'default',
   busy = false,
   icon,
@@ -98,6 +99,11 @@ export function ConfirmModal({
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
+  const { t } = useI18n();
+  const confirmText = confirmLabel ?? t('modal.confirm');
+  const cancelText = cancelLabel ?? t('modal.cancel');
+  const busyText = busyLabel ?? t('modal.pleaseWait');
+
   const titleId = useId();
   const descriptionId = useId();
 
@@ -330,7 +336,7 @@ export function ConfirmModal({
         <button
           type="button"
           className="confirm-modal-close"
-          aria-label="Close confirmation"
+          aria-label={t('aria.closeConfirmation')}
           disabled={busy}
           onClick={onCancel}
         >
@@ -379,8 +385,8 @@ export function ConfirmModal({
           )}
         </div>
 
-        <div className={`confirm-modal-actions${cancelLabel ? '' : ' confirm-modal-actions--single'}`}>
-          {cancelLabel && (
+        <div className={`confirm-modal-actions${cancelText ? '' : ' confirm-modal-actions--single'}`}>
+          {cancelText && (
             <button
               ref={cancelButtonRef}
               type="button"
@@ -388,7 +394,7 @@ export function ConfirmModal({
               disabled={busy}
               onClick={onCancel}
             >
-              {cancelLabel}
+              {cancelText}
             </button>
           )}
 
@@ -413,8 +419,8 @@ export function ConfirmModal({
 
             <span>
               {busy
-                ? busyLabel
-                : confirmLabel}
+                ? busyText
+                : confirmText}
             </span>
           </button>
         </div>

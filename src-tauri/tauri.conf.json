@@ -16,10 +16,12 @@
         "title": "LumaForge Panel",
         "width": 900,
         "height": 810,
+        "minWidth": 720,
+        "minHeight": 520,
         "visible": false,
         "decorations": false,
         "transparent": true,
-        "resizable": false,
+        "resizable": true,
         "maximizable": false,
         "center": true
       }

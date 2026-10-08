@@ -346,10 +346,9 @@ fn flip_path(root: &Path, rel: &str, enable: bool) -> Result<(), String> {
     };
 
     rename_one(from, to).map_err(|e| {
-        format!(
-            "Failed to rename {} -> {}: {e}",
-            from.display(),
-            to.display()
+        crate::i18n::t(
+            "err.rename",
+            &[&from.display().to_string(), &to.display().to_string(), &e.to_string()],
         )
     })
 }
@@ -373,7 +372,7 @@ pub fn set_enabled(app: &tauri::AppHandle, def: &ToolDef, enable: bool) -> Resul
 
 fn set_enabled_inner(app: &tauri::AppHandle, def: &ToolDef, enable: bool) -> Result<(String, bool), String> {
     if !def.platform.matches() {
-        return Err(format!("{} is not available on this OS.", def.name));
+        return Err(crate::i18n::t("tool.unavailable", &[def.name]));
     }
 
     let current = tool_state(def);
@@ -385,9 +384,9 @@ fn set_enabled_inner(app: &tauri::AppHandle, def: &ToolDef, enable: bool) -> Res
     }
 
     let steam_root = paths::detect_steam_root()
-        .ok_or_else(|| "Steam root not found.".to_string())?;
+        .ok_or_else(|| crate::i18n::t("err.steam_root", &[]))?;
     let Some(root) = def.root(&steam_root) else {
-        return Err("Deploy root not found.".to_string());
+        return Err(crate::i18n::t("err.deploy_root", &[]));
     };
 
     let mut restart_required = false;
@@ -405,9 +404,9 @@ fn set_enabled_inner(app: &tauri::AppHandle, def: &ToolDef, enable: bool) -> Res
     state::set_enabled(def.id, enable)?;
 
     let message = if enable {
-        format!("{} enabled.", def.name)
+        crate::i18n::t("tool.enabled", &[def.name])
     } else {
-        format!("{} disabled.", def.name)
+        crate::i18n::t("tool.disabled", &[def.name])
     };
 
     Ok((message, restart_required))
@@ -481,7 +480,7 @@ fn deploy(app: &tauri::AppHandle, def: &ToolDef, src: &Path) -> Result<bool, Str
             Ok(false)
         }
         DeployTarget::Plugins { dir } => {
-            emit_progress(app, "deploy", "Copying plugin files...");
+            emit_progress(app, "deploy", crate::i18n::t("progress.copy_plugin", &[]));
             let dst = paths::plugins_dir().join(dir);
             if dst.exists() {
                 github::remove_dir_recursive(&dst)?;
@@ -492,8 +491,8 @@ fn deploy(app: &tauri::AppHandle, def: &ToolDef, src: &Path) -> Result<bool, Str
         }
         DeployTarget::SteamRoot { files } => {
             let steam_root = paths::detect_steam_root()
-                .ok_or_else(|| "Steam root not found.".to_string())?;
-            emit_progress(app, "deploy", "Deploying files to the Steam directory...");
+                .ok_or_else(|| crate::i18n::t("err.steam_root", &[]))?;
+            emit_progress(app, "deploy", crate::i18n::t("progress.deploy_steam", &[]));
 
             let mut restart_required = false;
             let mut errors: Vec<String> = Vec::new();
@@ -501,7 +500,7 @@ fn deploy(app: &tauri::AppHandle, def: &ToolDef, src: &Path) -> Result<bool, Str
             let copy_once = |rel: &str| -> Result<(), String> {
                 let from = resolve_rel(src, rel);
                 if !from.exists() {
-                    return Err(format!("{rel} not found in release"));
+                    return Err(crate::i18n::t("err.release_missing", &[rel]));
                 }
                 copy_entry(&from, &steam_root.join(rel))
             };
@@ -530,16 +529,15 @@ fn deploy(app: &tauri::AppHandle, def: &ToolDef, src: &Path) -> Result<bool, Str
                     if !path.exists()
                         && !PathBuf::from(format!("{}.bak", path.display())).exists()
                     {
-                        errors.push(format!("{rel} missing after deploy"));
+                        errors.push(crate::i18n::t("err.missing_after_deploy", &[rel]));
                     }
                 }
             }
 
             if !errors.is_empty() {
-                return Err(format!(
-                    "Deploy of {} failed: {}",
-                    def.name,
-                    errors.join("; ")
+                return Err(crate::i18n::t(
+                    "err.deploy",
+                    &[def.name, &errors.join("; ")],
                 ));
             }
 
@@ -554,9 +552,131 @@ fn run_post_install(app: &tauri::AppHandle, def: &ToolDef) -> Result<(), String>
         return Ok(());
     }
     let steam_root = paths::detect_steam_root()
-        .ok_or_else(|| "Steam root not found - cannot finish setup.".to_string())?;
-    emit_progress(app, "setup", "Running post-install setup...");
+        .ok_or_else(|| crate::i18n::t("err.steam_root_setup", &[]))?;
+    emit_progress(app, "setup", crate::i18n::t("progress.setup", &[]));
     postinstall::run_all(def.post_install, &steam_root)
+}
+
+// ---------------------------------------------------------------------------
+// Uninstall
+// ---------------------------------------------------------------------------
+
+fn remove_any(path: &Path) -> Result<(), String> {
+    if path.is_dir() {
+        github::remove_dir_recursive(path)
+    } else {
+        std::fs::remove_file(path)
+            .map_err(|e| format!("{}", crate::i18n::t("err.remove", &[&path.display().to_string(), &e.to_string()])))
+    }
+}
+
+/// Delete `root/rel` (live and `.bak`). When a sibling `.orig` exists it is
+/// restored instead — the Linux `libXtst.so.6.orig` convention keeps Steam's
+/// own file after the proxy goes away.
+fn remove_deployed(root: &Path, rel: &str) -> Result<(), String> {
+    let live = resolve_rel(root, rel);
+    let backup = PathBuf::from(format!("{}.bak", live.display()));
+    let orig = PathBuf::from(format!("{}.orig", live.display()));
+
+    if orig.exists() {
+        if live.exists() {
+            remove_any(&live)?;
+        }
+        std::fs::rename(&orig, &live)
+            .map_err(|e| format!("{}", crate::i18n::t("err.restore", &[&orig.display().to_string(), &e.to_string()])))?;
+    } else if live.exists() {
+        remove_any(&live)?;
+    }
+
+    if backup.exists() {
+        remove_any(&backup)?;
+    }
+    Ok(())
+}
+
+/// Remove everything the tool deployed plus its state entry. Steam-root
+/// tools stop Steam first (locked DLLs) and ask for a restart afterwards.
+/// Returns `(message, restart_required)`.
+pub fn uninstall(def: &ToolDef) -> Result<(String, bool), String> {
+    if !def.platform.matches() {
+        return Err(crate::i18n::t("tool.unavailable", &[def.name]));
+    }
+
+    let steam_root = paths::detect_steam_root()
+        .ok_or_else(|| crate::i18n::t("err.steam_root", &[]))?;
+    let Some(root) = def.root(&steam_root) else {
+        return Err(crate::i18n::t("err.deploy_root", &[]));
+    };
+
+    let mut restart_required = false;
+    let is_steam_root_deploy = matches!(def.target, DeployTarget::SteamRoot { .. });
+
+    if is_steam_root_deploy && steam::is_steam_running() {
+        steam::ensure_steam_stopped()?;
+        restart_required = true;
+    }
+
+    // Undo wiring that lives outside the deployed files (steam.sh LD_AUDIT);
+    // config files the user may have edited are intentionally left alone.
+    if !def.post_install.is_empty() {
+        postinstall::on_toggle(def.post_install, false, &steam_root)?;
+        if def.post_install.contains(&PostInstall::SlssteamSetup)
+            && steam::is_steam_running()
+        {
+            restart_required = true;
+        }
+    }
+
+    let mut errors: Vec<String> = Vec::new();
+
+    match def.target {
+        DeployTarget::SteamRoot { files } => {
+            // Everything that ever landed in the Steam root: declared deploy
+            // files, toggle paths and installed markers (covers `.bak` state
+            // and marker files inside a deployed directory).
+            let mut rels: Vec<&str> = files.to_vec();
+            for rel in def.toggle.iter().chain(def.installed.iter()) {
+                if !rels.contains(rel) {
+                    rels.push(rel);
+                }
+            }
+            for rel in rels {
+                if let Err(e) = remove_deployed(&steam_root, rel) {
+                    errors.push(e);
+                }
+            }
+        }
+        DeployTarget::Plugins { dir } => {
+            let dst = paths::plugins_dir().join(dir);
+            if dst.exists() {
+                if let Err(e) = remove_any(&dst) {
+                    errors.push(e);
+                }
+            }
+        }
+        DeployTarget::Payload => {
+            if root.exists() {
+                if let Err(e) = remove_any(&root) {
+                    errors.push(e);
+                }
+            }
+        }
+    }
+
+    if !errors.is_empty() {
+        return Err(crate::i18n::t(
+            "tool.uninstall_failed",
+            &[def.name, &errors.join("; ")],
+        ));
+    }
+
+    state::remove_tool(def.id)?;
+
+    if tool_state(def) != ComponentState::Missing {
+        return Err(crate::i18n::t("tool.still_present", &[def.name]));
+    }
+
+    Ok((crate::i18n::t("tool.uninstalled", &[def.name]), restart_required))
 }
 
 /// Download the latest release, extract it into a temp dir and deploy from
@@ -581,7 +701,7 @@ fn install_inner(
     force: bool,
 ) -> Result<(String, bool), String> {
     if !def.platform.matches() {
-        return Err(format!("{} is not available on this OS.", def.name));
+        return Err(crate::i18n::t("tool.unavailable", &[def.name]));
     }
 
     let is_payload = matches!(def.target, DeployTarget::Payload);
@@ -598,21 +718,16 @@ fn install_inner(
             let _ = state::record_install(def.id, &version, true);
         }
 
-        emit_progress(app, "deploy", "Files already present - deploying...");
+        emit_progress(app, "deploy", crate::i18n::t("progress.already_present", &[]));
         let restart_required = deploy(app, def, &target_dir)?;
         run_post_install(app, def)?;
-        return Ok((format!("{} is already installed.", def.name), restart_required));
+        return Ok((crate::i18n::t("tool.already_installed", &[def.name]), restart_required));
     }
 
-    emit_progress(app, "fetch", format!("Fetching {} release...", def.name));
+    emit_progress(app, "fetch", crate::i18n::t("progress.fetch", &[def.name]));
     let (owner, repo, asset, contains) = def.resolve_github();
     let release = github::get_latest_github_release(owner, repo, asset, contains)
-        .map_err(|e| {
-            format!(
-                "No release available for {} yet: {e}",
-                def.name
-            )
-        })?;
+        .map_err(|e| crate::i18n::t("err.no_release", &[def.name, &e.to_string()]))?;
 
     let ts = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -625,13 +740,13 @@ fn install_inner(
         emit_progress(
             app,
             "download",
-            format!("Downloading {} v{}...", def.name, release.tag_name),
+            crate::i18n::t("progress.download", &[def.name, &release.tag_name]),
         );
         let archive_path = temp_dir.join(&release.zip_name);
         github::download_file(&release.zip_url, &archive_path)
-            .map_err(|e| format!("Download failed: {e}"))?;
+            .map_err(|e| format!("{}", crate::i18n::t("err.download", &[&e.to_string()])))?;
 
-        emit_progress(app, "extract", "Extracting...");
+        emit_progress(app, "extract", crate::i18n::t("progress.extract", &[]));
         let effective_src = if release.archive_ext == "dll" || release.archive_ext == "so" {
             // The archive *is* the deployable file, already sitting at
             // `temp_dir/{zip_name}` — which matches the deploy rel path.
@@ -639,7 +754,7 @@ fn install_inner(
         } else {
             let extract_dir = temp_dir.join("extracted");
             github::extract_archive(&archive_path, &release.archive_ext, &extract_dir)
-                .map_err(|e| format!("Extraction failed: {e}"))?;
+                .map_err(|e| format!("{}", crate::i18n::t("err.extract", &[&e.to_string()])))?;
             resolve_payload_root(def, &extract_dir)
         };
 
@@ -647,7 +762,7 @@ fn install_inner(
         // from the temp dir so `thirdparty/{id}` never gets created for them.
         if is_payload {
             std::fs::create_dir_all(&target_dir)
-                .map_err(|e| format!("Failed to create tool dir: {e}"))?;
+                .map_err(|e| format!("{}", crate::i18n::t("err.tool_dir", &[&e.to_string()])))?;
             github::copy_dir_recursive(&effective_src, &target_dir)?;
         }
 
@@ -657,7 +772,7 @@ fn install_inner(
         let _ = std::fs::remove_dir_all(&temp_dir);
 
         Ok((
-            format!("{} v{} installed.", def.name, release.tag_name),
+            crate::i18n::t("tool.installed", &[def.name, &release.tag_name]),
             restart_required,
         ))
     })();

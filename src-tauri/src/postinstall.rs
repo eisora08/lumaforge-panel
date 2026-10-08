@@ -56,7 +56,7 @@ fn setup_ost(steam_root: &Path) -> Result<(), String> {
     // it recursively so a missing `config\` directory is fine too.
     let lua_dir = steam_root.join("config").join("lua");
     fs::create_dir_all(&lua_dir)
-        .map_err(|e| format!("Failed to create {}: {e}", lua_dir.display()))?;
+        .map_err(|e| format!("{}", crate::i18n::t("err.create_dir", &[&lua_dir.display().to_string(), &e.to_string()])))?;
 
     ensure_ost_toml(steam_root)
 }
@@ -69,12 +69,12 @@ fn ensure_ost_toml(steam_root: &Path) -> Result<(), String> {
 
     if !toml_path.exists() {
         fs::write(&toml_path, DEFAULT_OST_TOML)
-            .map_err(|e| format!("Failed to create opensteamtool.toml: {e}"))?;
+            .map_err(|e| format!("{}", crate::i18n::t("err.create_dir", &["opensteamtool.toml", &e.to_string()])))?;
         return Ok(());
     }
 
     let before = fs::read_to_string(&toml_path)
-        .map_err(|e| format!("Failed to read opensteamtool.toml: {e}"))?;
+        .map_err(|e| format!("{}", crate::i18n::t("err.read", &["opensteamtool.toml", &e.to_string()])))?;
     if before.contains("enabled = true")
         && before.contains("[manifest]")
         && before.contains("url = \"manifestdex\"")
@@ -98,7 +98,7 @@ fn ensure_ost_toml(steam_root: &Path) -> Result<(), String> {
     force_toml_value(&mut lines, "manifest", "url", "manifestdex");
 
     fs::write(&toml_path, lines.join(newline))
-        .map_err(|e| format!("Failed to write opensteamtool.toml: {e}"))
+        .map_err(|e| format!("{}", crate::i18n::t("err.write", &["opensteamtool.toml", &e.to_string()])))
 }
 
 /// Ensure `<section>` has `key = "value"` (string values are always quoted;
@@ -168,12 +168,12 @@ fn patch_opensteamtool_cloud_enabled(steam_root: &Path) -> Result<String, String
 
     if !toml_path.exists() {
         fs::write(&toml_path, "[cloud]\nenabled = true\n")
-            .map_err(|e| format!("Failed to create opensteamtool.toml: {e}"))?;
+            .map_err(|e| format!("{}", crate::i18n::t("err.create_dir", &["opensteamtool.toml", &e.to_string()])))?;
         return Ok("created".to_string());
     }
 
     let content = fs::read_to_string(&toml_path)
-        .map_err(|e| format!("Failed to read opensteamtool.toml: {e}"))?;
+        .map_err(|e| format!("{}", crate::i18n::t("err.read", &["opensteamtool.toml", &e.to_string()])))?;
     let newline = if content.contains("\r\n") { "\r\n" } else { "\n" };
 
     let lines: Vec<&str> = content.split('\n').collect();
@@ -243,7 +243,7 @@ fn patch_opensteamtool_cloud_enabled(steam_root: &Path) -> Result<String, String
         }
         let new_content = new_lines.join(newline);
         fs::write(&toml_path, new_content)
-            .map_err(|e| format!("Failed to write opensteamtool.toml: {e}"))?;
+            .map_err(|e| format!("{}", crate::i18n::t("err.write", &["opensteamtool.toml", &e.to_string()])))?;
         return Ok("updated".to_string());
     }
 
@@ -255,7 +255,7 @@ fn patch_opensteamtool_cloud_enabled(steam_root: &Path) -> Result<String, String
         new_content.push_str("enabled = true");
         new_content.push_str(newline);
         fs::write(&toml_path, new_content)
-            .map_err(|e| format!("Failed to write opensteamtool.toml: {e}"))?;
+            .map_err(|e| format!("{}", crate::i18n::t("err.write", &["opensteamtool.toml", &e.to_string()])))?;
         return Ok("created".to_string());
     }
 
@@ -271,7 +271,7 @@ fn patch_opensteamtool_cloud_enabled(steam_root: &Path) -> Result<String, String
         }
         let new_content = new_lines.join(newline);
         fs::write(&toml_path, new_content)
-            .map_err(|e| format!("Failed to write opensteamtool.toml: {e}"))?;
+            .map_err(|e| format!("{}", crate::i18n::t("err.write", &["opensteamtool.toml", &e.to_string()])))?;
         return Ok("created".to_string());
     }
 
@@ -296,22 +296,22 @@ fn find_slssteam_file(name: &str) -> Option<PathBuf> {
 fn slssteam_setup(steam_root: &Path) -> Result<(), String> {
     let steam_sh = steam_root.join("steam.sh");
     if !steam_sh.exists() {
-        return Err("steam.sh not found in the Steam root.".to_string());
+        return Err(crate::i18n::t("err.steam_sh_missing", &[]));
     }
 
     let slssteam_so =
-        find_slssteam_file("SLSsteam.so").ok_or_else(|| "SLSsteam.so not found in payload.".to_string())?;
+        find_slssteam_file("SLSsteam.so").ok_or_else(|| crate::i18n::t("err.slssteam_missing", &[]))?;
     let library_inject = find_slssteam_file("library-inject.so")
-        .ok_or_else(|| "library-inject.so not found in payload.".to_string())?;
+        .ok_or_else(|| crate::i18n::t("err.library_inject_missing", &[]))?;
     let ld_audit = format!("{}:{}", library_inject.display(), slssteam_so.display());
 
     let content = fs::read_to_string(&steam_sh)
-        .map_err(|e| format!("Failed to read steam.sh: {e}"))?;
+        .map_err(|e| format!("{}", crate::i18n::t("err.read", &["steam.sh", &e.to_string()])))?;
 
     let backup = steam_root.join("steam.sh.bak");
     if !backup.exists() {
         fs::copy(&steam_sh, &backup)
-            .map_err(|e| format!("Failed to create steam.sh.bak: {e}"))?;
+            .map_err(|e| format!("{}", crate::i18n::t("err.create_dir", &["steam.sh.bak", &e.to_string()])))?;
     }
 
     write_patched_steam_sh(&steam_sh, &content, Some(&ld_audit))?;
@@ -321,17 +321,17 @@ fn slssteam_setup(steam_root: &Path) -> Result<(), String> {
         steam_root.join("steam.cfg"),
         "BootStrapperInhibitAll=enable\nBootStrapperForceSelfUpdate=disable\n",
     )
-    .map_err(|e| format!("Failed to create steam.cfg: {e}"))?;
+    .map_err(|e| format!("{}", crate::i18n::t("err.create_dir", &["steam.cfg", &e.to_string()])))?;
 
     // Seed a default config only when none exists — never clobber user data.
     let config_path = slssteam_config_path();
     if !config_path.exists() {
         if let Some(parent) = config_path.parent() {
             fs::create_dir_all(parent)
-                .map_err(|e| format!("Failed to create {}: {e}", parent.display()))?;
+                .map_err(|e| format!("{}", crate::i18n::t("err.create_dir", &[&parent.display().to_string(), &e.to_string()])))?;
         }
         fs::write(&config_path, DEFAULT_SLSSTEAM_CONFIG)
-            .map_err(|e| format!("Failed to create config.yaml: {e}"))?;
+            .map_err(|e| format!("{}", crate::i18n::t("err.create_dir", &["config.yaml", &e.to_string()])))?;
     }
 
     Ok(())
@@ -377,7 +377,7 @@ fn write_patched_steam_sh(path: &Path, content: &str, ld_audit: Option<&str>) ->
     }
 
     fs::write(path, new_lines.join("\n"))
-        .map_err(|e| format!("Failed to write steam.sh: {e}"))
+        .map_err(|e| format!("{}", crate::i18n::t("err.write", &["steam.sh", &e.to_string()])))
 }
 
 fn strip_ld_audit(steam_root: &Path) -> Result<(), String> {
@@ -386,7 +386,7 @@ fn strip_ld_audit(steam_root: &Path) -> Result<(), String> {
         return Ok(());
     }
     let content = fs::read_to_string(&steam_sh)
-        .map_err(|e| format!("Failed to read steam.sh: {e}"))?;
+        .map_err(|e| format!("{}", crate::i18n::t("err.read", &["steam.sh", &e.to_string()])))?;
     if !content.contains("export LD_AUDIT=") {
         return Ok(());
     }

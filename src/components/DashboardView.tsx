@@ -11,6 +11,7 @@ import { listen } from '@tauri-apps/api/event';
 import { ConfirmModal } from './ConfirmModal';
 import { ThemesCard } from './ThemesCard';
 import { useToast } from './Toast';
+import { useI18n, type TranslateArg } from '../i18n';
 import type {
   ComponentState,
   InstallProgress,
@@ -26,6 +27,7 @@ import {
   Terminal,
   Cloud,
   Shield,
+  Trash2,
 } from 'lucide-react';
 
 type BusyKind = 'cdp' | 'tool' | 'steam' | null;
@@ -43,19 +45,23 @@ const TOOL_ICONS: Record<string, ReactNode> = {
   slssteam: <Shield size={16} aria-hidden="true" />,
 };
 
-function stateBadge(state: ComponentState): { label: string; cls: string } {
+function stateBadge(
+  t: (key: string, args?: readonly TranslateArg[]) => string,
+  state: ComponentState
+): { label: string; cls: string } {
   switch (state) {
     case 'enabled':
-      return { label: 'Active', cls: 'status-ok' };
+      return { label: t('badge.active'), cls: 'status-ok' };
     case 'disabled':
-      return { label: 'Backed up', cls: 'status-label' };
+      return { label: t('badge.backedUp'), cls: 'status-label' };
     case 'missing':
-      return { label: 'Not installed', cls: 'status-warn' };
+      return { label: t('badge.notInstalled'), cls: 'status-warn' };
   }
 }
 
 export function DashboardView() {
   const toast = useToast();
+  const { t } = useI18n();
 
   const [status, setStatus] = useState<PanelStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,6 +72,9 @@ export function DashboardView() {
     'success' | 'error' | null
   >(null);
   const [restartOpen, setRestartOpen] = useState(false);
+  const [uninstallTarget, setUninstallTarget] = useState<ToolStatus | null>(
+    null
+  );
 
   const listenerRef = useRef<(() => void) | null>(null);
   const pendingRestartRef = useRef(false);
@@ -230,6 +239,36 @@ export function DashboardView() {
     [busy, modal, openInstallModal, refresh, toast]
   );
 
+  const handleUninstall = useCallback(async () => {
+    const target = uninstallTarget;
+    if (!target || busy || modal) return;
+
+    setBusy('tool');
+    try {
+      const result = await invoke<PanelResult>('uninstall_tool', {
+        toolId: target.id,
+      });
+      if (result.ok) {
+        toast.success(result.message);
+        pendingRestartRef.current = result.restartRequired;
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : String(error)
+      );
+    } finally {
+      setBusy(null);
+      setUninstallTarget(null);
+      await refresh();
+      if (pendingRestartRef.current) {
+        pendingRestartRef.current = false;
+        setRestartOpen(true);
+      }
+    }
+  }, [uninstallTarget, busy, modal, refresh, toast]);
+
   const startSteam = useCallback(async () => {
     if (busy) return;
     setBusy('steam');
@@ -274,48 +313,48 @@ export function DashboardView() {
   const cdpStatusCopy = useMemo(() => {
     if (cdpBusy) {
       return {
-        eyebrow: 'APPLYING CHANGES',
-        title: 'Updating CDP injection…',
-        description: 'Steam may restart to apply the new state.',
-        buttonLabel: 'WAIT',
-        description2: 'Operation in progress',
+        eyebrow: t('hero.busyEyebrow'),
+        title: t('hero.busyTitle'),
+        description: t('hero.busyDesc'),
+        buttonLabel: t('hero.busyBtn'),
+        description2: t('hero.busyDesc2'),
       };
     }
     if (loading && !status) {
       return {
-        eyebrow: 'CHECKING SYSTEM',
-        title: 'Verifying system state',
-        description: 'Reading components from disk.',
-        buttonLabel: 'CHECKING',
-        description2: 'Reading system state',
+        eyebrow: t('hero.checkEyebrow'),
+        title: t('hero.checkTitle'),
+        description: t('hero.checkDesc'),
+        buttonLabel: t('hero.checkBtn'),
+        description2: t('hero.checkDesc2'),
       };
     }
     if (cdpState === 'missing') {
       return {
-        eyebrow: 'RUNTIME NOT INSTALLED',
-        title: 'Install the LumaForge runtime',
-        description: `${cdpLoader} is not present in the Steam directory yet.`,
-        buttonLabel: 'INSTALL',
-        description2: 'Download and install the runtime',
+        eyebrow: t('hero.missingEyebrow'),
+        title: t('hero.missingTitle'),
+        description: t('hero.missingDesc', [cdpLoader]),
+        buttonLabel: t('hero.missingBtn'),
+        description2: t('hero.missingDesc2'),
       };
     }
     if (cdpState === 'enabled') {
       return {
-        eyebrow: 'CDP INJECTION ACTIVE',
-        title: 'LumaForge is running',
-        description: `${cdpLoader} is loaded by Steam and extensions are being injected.`,
-        buttonLabel: 'ENABLED',
-        description2: 'Disable CDP injection',
+        eyebrow: t('hero.enabledEyebrow'),
+        title: t('hero.enabledTitle'),
+        description: t('hero.enabledDesc', [cdpLoader]),
+        buttonLabel: t('hero.enabledBtn'),
+        description2: t('hero.enabledDesc2'),
       };
     }
     return {
-      eyebrow: 'CDP INJECTION OFF',
-      title: 'LumaForge is paused',
-      description: `The loader is backed up as ${cdpLoader}.bak and Steam loads vanilla.`,
-      buttonLabel: 'DISABLED',
-      description2: 'Enable CDP injection',
+      eyebrow: t('hero.disabledEyebrow'),
+      title: t('hero.disabledTitle'),
+      description: t('hero.disabledDesc', [cdpLoader]),
+      buttonLabel: t('hero.disabledBtn'),
+      description2: t('hero.disabledDesc2'),
     };
-  }, [cdpBusy, cdpLoader, cdpState, loading, status]);
+  }, [cdpBusy, cdpLoader, cdpState, loading, status, t]);
 
   const heroState = cdpBusy
     ? 'busy'
@@ -332,17 +371,18 @@ export function DashboardView() {
     [status]
   );
 
-  const steamStatusText = useMemo(() => {    if (loading && !status) return 'Checking';
-    if (status?.steam.steamRunning) return 'Running';
-    return 'Stopped';
-  }, [status, loading]);
+  const steamStatusText = useMemo(() => {
+    if (loading && !status) return t('steam.checking');
+    if (status?.steam.steamRunning) return t('steam.running');
+    return t('steam.stopped');
+  }, [status, loading, t]);
 
   const openSteamAction = useMemo(() => {
     if (!status) return null;
     if (status.steam.steamRunning) return null;
-    if (status.steam.steamExecutableFound) return 'Start Steam';
+    if (status.steam.steamExecutableFound) return t('steam.startSteam');
     return null;
-  }, [status]);
+  }, [status, t]);
 
   return (
     <>
@@ -350,7 +390,7 @@ export function DashboardView() {
         <main className="panel-column">
           <section
             className={`panel-hero panel-hero--${heroState}`}
-            aria-label="CDP injection"
+            aria-label={t('aria.cdpInjection')}
           >
             <div className="panel-hero-copy">
               <div className={`dashboard-state dashboard-state--${heroState}`}>
@@ -379,12 +419,16 @@ export function DashboardView() {
                   )}
                 </span>
                 <span className="panel-fact">
-                  Components: <strong>{stateBadge(cdpState).label}</strong>
+                  {t('fact.components')}{' '}
+                  <strong>{stateBadge(t, cdpState).label}</strong>
                 </span>
                 <span className="panel-fact">
-                  Components on:{' '}
+                  {t('fact.componentsOn')}{' '}
                   <strong>
-                    {enabledTools} of {status?.tools.length ?? 0}
+                    {t('fact.count', [
+                      enabledTools,
+                      status?.tools.length ?? 0,
+                    ])}
                   </strong>
                 </span>
               </div>
@@ -402,8 +446,8 @@ export function DashboardView() {
                 aria-busy={cdpBusy}
                 aria-label={
                   cdpState === 'enabled'
-                    ? 'Disable CDP injection'
-                    : 'Enable CDP injection'
+                    ? t('aria.disableCdp')
+                    : t('aria.enableCdp')
                 }
                 title={cdpStatusCopy.description2}
               >
@@ -419,9 +463,12 @@ export function DashboardView() {
             </div>
           </section>
 
-          <section className="panel-components" aria-label="Components">
+          <section
+            className="panel-components"
+            aria-label={t('aria.components')}
+          >
             {status?.tools.map((tool) => {
-              const badge = stateBadge(tool.state);
+              const badge = stateBadge(t, tool.state);
               const toggleBusy = busy === 'tool';
 
               return (
@@ -451,7 +498,7 @@ export function DashboardView() {
                         });
                       }}
                     >
-                      UPDATE
+                      {t('ui.update')}
                     </button>
                   ) : tool.state === 'missing' ? (
                     <button
@@ -466,7 +513,7 @@ export function DashboardView() {
                         });
                       }}
                     >
-                      INSTALL
+                      {t('ui.install')}
                     </button>
                   ) : (
                     <span className="panel-component-version">
@@ -476,12 +523,25 @@ export function DashboardView() {
                     </span>
                   )}
 
+                  {tool.state !== 'missing' && (
+                    <button
+                      type="button"
+                      className="panel-component-remove"
+                      disabled={toggleBusy || modal !== null}
+                      onClick={() => setUninstallTarget(tool)}
+                      aria-label={t('aria.uninstall', [tool.name])}
+                      title={t('aria.uninstall', [tool.name])}
+                    >
+                      <Trash2 size={13} aria-hidden="true" />
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     className="toggle panel-component-toggle"
                     role="switch"
                     aria-checked={tool.state === 'enabled'}
-                    aria-label={`Toggle ${tool.name}`}
+                    aria-label={t('aria.toggleTool', [tool.name])}
                     aria-busy={toggleBusy}
                     disabled={toggleBusy || modal !== null || loading}
                     onClick={() => {
@@ -500,8 +560,8 @@ export function DashboardView() {
           <div className="panel-footer">
             <span className="panel-footer-path">
               {status?.steamRoot
-                ? `Steam · ${status.steamRoot}`
-                : 'Steam root not detected'}
+                ? t('footer.steamRoot', [status.steamRoot])
+                : t('footer.noSteamRoot')}
             </span>
 
             <button
@@ -512,7 +572,7 @@ export function DashboardView() {
               }}
               disabled={loading || busy !== null}
             >
-              Refresh
+              {t('ui.refresh')}
             </button>
           </div>
         </main>
@@ -520,12 +580,12 @@ export function DashboardView() {
 
       <ConfirmModal
         open={restartOpen}
-        title="Restart Steam to apply changes?"
-        description="Steam must restart so it can reload the patched DLLs and pick up the new component state."
-        warning="Make sure no game, installation, or download is currently active before restarting Steam."
-        confirmLabel="RESTART STEAM"
-        cancelLabel="LATER"
-        busyLabel="RESTARTING..."
+        title={t('restart.title')}
+        description={t('restart.desc')}
+        warning={t('restart.warning')}
+        confirmLabel={t('restart.confirm')}
+        cancelLabel={t('restart.cancel')}
+        busyLabel={t('restart.busy')}
         tone="warning"
         busy={busy === 'steam'}
         autoFocus="cancel"
@@ -541,26 +601,25 @@ export function DashboardView() {
         open={modal !== null}
         title={
           modalResult === 'success'
-            ? 'Installation complete'
+            ? t('install.complete')
             : modalResult === 'error'
-              ? 'Installation failed'
+              ? t('install.failed')
               : modal?.kind === 'install-runtime'
-                ? 'Install LumaForge runtime'
-                : `Install ${modal?.kind === 'install-tool' ? modal.toolName : ''}`
+                ? t('install.runtimeTitle')
+                : t('install.toolTitle', [
+                    modal?.kind === 'install-tool' ? modal.toolName : '',
+                  ])
         }
         description={
           modalResult === 'success'
-            ? (progress?.message ?? 'Done.')
+            ? (progress?.message ?? t('install.doneMsg'))
             : modalResult === 'error'
-              ? (progress?.message ?? 'Something went wrong.')
-              : (progress?.message ??
-                'Downloads the release from GitHub, extracts it and deploys the files.')
+              ? (progress?.message ?? t('install.wrong'))
+              : (progress?.message ?? t('install.desc'))
         }
-        confirmLabel={
-          modalResult ? 'DONE' : modal?.kind === 'install-runtime' ? 'INSTALL' : 'INSTALL'
-        }
+        confirmLabel={modalResult ? t('ui.done') : t('ui.install')}
         cancelLabel=""
-        busyLabel="WORKING..."
+        busyLabel={t('ui.working')}
         tone={modalResult === 'error' ? 'danger' : 'default'}
         busy={modalResult === null && modal !== null}
         closeOnBackdrop={modalResult !== null}
@@ -568,6 +627,25 @@ export function DashboardView() {
         autoFocus="confirm"
         onCancel={closeModal}
         onConfirm={closeModal}
+      />
+
+      <ConfirmModal
+        open={uninstallTarget !== null}
+        title={t('uninstall.title', [uninstallTarget?.name ?? ''])}
+        description={t('uninstall.desc', [
+          uninstallTarget?.deployPath ?? t('uninstall.disk'),
+        ])}
+        warning={t('uninstall.warning')}
+        confirmLabel={t('uninstall.confirm')}
+        cancelLabel={t('uninstall.cancel')}
+        busyLabel={t('uninstall.busy')}
+        tone="danger"
+        busy={busy === 'tool'}
+        autoFocus="cancel"
+        onCancel={() => setUninstallTarget(null)}
+        onConfirm={() => {
+          void handleUninstall();
+        }}
       />
     </>
   );

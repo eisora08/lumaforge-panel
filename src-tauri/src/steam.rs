@@ -164,14 +164,14 @@ fn launch_steam_process() -> Result<(), String> {
     use std::os::windows::process::CommandExt;
 
     let executable =
-        resolve_steam_executable().ok_or_else(|| "Steam executable not found.".to_string())?;
+        resolve_steam_executable().ok_or_else(|| crate::i18n::t("err.steam_exec", &[]))?;
 
     eprintln!("[STEAM] Starting Steam: {}", executable.display());
 
     Command::new(&executable)
         .creation_flags(CREATE_NO_WINDOW)
         .spawn()
-        .map_err(|error| format!("Failed to start Steam: {error}"))?;
+        .map_err(|error| crate::i18n::t("err.steam_start", &[&error.to_string()]))?;
 
     Ok(())
 }
@@ -179,20 +179,20 @@ fn launch_steam_process() -> Result<(), String> {
 #[cfg(target_os = "linux")]
 fn launch_steam_process() -> Result<(), String> {
     let launcher =
-        resolve_steam_launcher().ok_or_else(|| "Steam launcher not found.".to_string())?;
+        resolve_steam_launcher().ok_or_else(|| crate::i18n::t("err.steam_launcher", &[]))?;
 
     eprintln!("[STEAM] Starting Steam: {}", launcher.display());
 
     Command::new(&launcher)
         .spawn()
-        .map_err(|error| format!("Failed to start Steam: {error}"))?;
+        .map_err(|error| crate::i18n::t("err.steam_start", &[&error.to_string()]))?;
 
     Ok(())
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "linux")))]
 fn launch_steam_process() -> Result<(), String> {
-    Err("Automatic Steam startup is not supported on this platform.".to_string())
+    Err(crate::i18n::t("err.start_unsupported", &[]))
 }
 
 pub fn wait_for_steam_exit(timeout: Duration) -> Result<(), String> {
@@ -205,9 +205,9 @@ pub fn wait_for_steam_exit(timeout: Duration) -> Result<(), String> {
         thread::sleep(Duration::from_millis(PROCESS_POLL_INTERVAL_MS));
     }
 
-    Err(format!(
-        "Steam did not close within {} seconds. Close Steam manually and try again.",
-        timeout.as_secs()
+    Err(crate::i18n::t(
+        "err.steam_exit_timeout",
+        &[&timeout.as_secs().to_string()],
     ))
 }
 
@@ -237,7 +237,7 @@ fn request_normal_steam_exit() -> Result<(), String> {
         .args(["/C", "start", "", "steam://exit"])
         .creation_flags(CREATE_NO_WINDOW)
         .spawn()
-        .map_err(|error| format!("Failed to request Steam shutdown: {error}"))?;
+        .map_err(|error| crate::i18n::t("err.steam_shutdown", &[&error.to_string()]))?;
 
     Ok(())
 }
@@ -250,7 +250,7 @@ fn request_normal_steam_exit() -> Result<(), String> {
 
     // `steam -shutdown` talks to the already-running client over its IPC socket.
     let Some(executable) = resolve_steam_executable() else {
-        return Err("Steam executable not found.".to_string());
+        return Err(crate::i18n::t("err.steam_exec", &[]));
     };
 
     eprintln!("[STEAM] Requesting normal shutdown");
@@ -258,14 +258,14 @@ fn request_normal_steam_exit() -> Result<(), String> {
     Command::new(&executable)
         .arg("-shutdown")
         .spawn()
-        .map_err(|error| format!("Failed to request Steam shutdown: {error}"))?;
+        .map_err(|error| crate::i18n::t("err.steam_shutdown", &[&error.to_string()]))?;
 
     Ok(())
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "linux")))]
 fn request_normal_steam_exit() -> Result<(), String> {
-    Err("Steam shutdown is not supported on this platform.".to_string())
+    Err(crate::i18n::t("err.shutdown_unsupported", &[]))
 }
 
 /// Stop Steam gracefully when it is running.

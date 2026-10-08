@@ -8,10 +8,12 @@ import {
   X,
   Settings as SettingsIcon,
   RefreshCw,
+  FolderOpen,
 } from 'lucide-react';
 import { DashboardView } from './components/DashboardView';
 import { ConfirmModal } from './components/ConfirmModal';
 import { ToastProvider, useToast } from './components/Toast';
+import { I18nProvider, useI18n, type Lang } from './i18n';
 import type { PanelSettings, PanelStatus, PartialSettings } from './types';
 import './App.css';
 
@@ -50,6 +52,7 @@ function applyTheme(theme: string) {
 
 function Shell() {
   const toast = useToast();
+  const { t, lang, setLang, applySaved } = useI18n();
   const win = getCurrentWindow();
 
   const [appVersion, setAppVersion] = useState('');
@@ -97,6 +100,14 @@ function Shell() {
       .then((next) => {
         setSettings(next);
         applyTheme(next.appearance.theme);
+        const active = applySaved(next.language);
+        if (!next.language) {
+          void invoke<PanelSettings>('update_settings', {
+            partial: { language: active },
+          })
+            .then(setSettings)
+            .catch(() => {});
+        }
       })
       .catch(() => setSettings(null));
 
@@ -105,7 +116,7 @@ function Shell() {
 
     const id = window.setInterval(() => void refreshStatus(), 15000);
     return () => window.clearInterval(id);
-  }, [refreshStatus, runUpdaterCheck]);
+  }, [refreshStatus, runUpdaterCheck, applySaved]);
 
   // Close popovers on outside click / Escape.
   useEffect(() => {
@@ -165,9 +176,13 @@ function Shell() {
         next.tools.filter((tool) => tool.updateAvailable).length +
         (freshUpdater ? 1 : 0);
       if (count > 0) {
-        toast.info(`${count} update${count > 1 ? 's' : ''} available.`);
+        toast.info(
+          count === 1
+            ? t('toast.updateAvailable', [count])
+            : t('toast.updatesAvailable', [count])
+        );
       } else {
-        toast.success('Everything is up to date.');
+        toast.success(t('toast.upToDate'));
       }
     } catch (error) {
       toast.error(
@@ -176,7 +191,7 @@ function Shell() {
     } finally {
       setChecking(false);
     }
-  }, [runUpdaterCheck, toast]);
+  }, [runUpdaterCheck, toast, t]);
 
   const runToolUpdate = useCallback(
     async (toolId: string) => {
@@ -190,7 +205,7 @@ function Shell() {
         if (result.ok) {
           toast.success(result.message);
           if (result.restartRequired) {
-            toast.warning('Restart Steam to finish applying the update.');
+            toast.warning(t('toast.restartForUpdate'));
           }
         } else {
           toast.error(result.message);
@@ -205,7 +220,7 @@ function Shell() {
         setMenu('none');
       }
     },
-    [refreshStatus, toast]
+    [refreshStatus, toast, t]
   );
 
   const runPanelUpdate = useCallback(async () => {
@@ -215,11 +230,11 @@ function Shell() {
     try {
       await updater.downloadAndInstall((event) => {
         if (event.event === 'Progress') {
-          setPanelProgress('Downloading...');
+          setPanelProgress(t('updates.downloading'));
         } else if (event.event === 'Finished') {
-          setPanelProgress('Installing...');
+          setPanelProgress(t('updates.installing'));
         } else {
-          setPanelProgress('Downloading...');
+          setPanelProgress(t('updates.downloading'));
         }
       });
       await relaunch();
@@ -230,7 +245,7 @@ function Shell() {
       setPanelUpdating(false);
       setPanelProgress(null);
     }
-  }, [toast, updater]);
+  }, [toast, updater, t]);
 
   const handleMinimize = useCallback(() => {
     void win.minimize();
@@ -266,7 +281,7 @@ function Shell() {
                 className="update-badge"
                 data-tauri-drag-region="noDrag"
                 data-menu-toggle
-                aria-label={`${updateCount} updates available`}
+                aria-label={t('app.updatesBadge', [updateCount])}
                 onClick={() =>
                   setMenu((current) =>
                     current === 'updates' ? 'none' : 'updates'
@@ -280,10 +295,27 @@ function Shell() {
 
             <button
               type="button"
+              className="window-btn window-btn-folder"
+              data-tauri-drag-region="noDrag"
+              aria-label={t('app.openDataFolder')}
+              title={t('app.openDataFolder')}
+              onClick={() => {
+                void invoke('open_app_data_dir').catch((error) => {
+                  toast.error(
+                    error instanceof Error ? error.message : String(error)
+                  );
+                });
+              }}
+            >
+              <FolderOpen size={13} aria-hidden="true" />
+            </button>
+
+            <button
+              type="button"
               className="window-btn window-btn-gear"
               data-tauri-drag-region="noDrag"
               data-menu-toggle
-              aria-label="Settings"
+              aria-label={t('app.settings')}
               aria-expanded={menu === 'settings'}
               onClick={() =>
                 setMenu((current) =>
@@ -299,7 +331,7 @@ function Shell() {
               className="window-btn window-btn-minimize"
               data-tauri-drag-region="noDrag"
               onClick={handleMinimize}
-              aria-label="Minimize window"
+              aria-label={t('app.minimize')}
             >
               <Minus size={12} aria-hidden="true" />
             </button>
@@ -309,7 +341,7 @@ function Shell() {
               className="window-btn window-btn-close"
               data-tauri-drag-region="noDrag"
               onClick={handleClose}
-              aria-label="Close window"
+              aria-label={t('app.close')}
             >
               <X size={12} aria-hidden="true" />
             </button>
@@ -320,9 +352,9 @@ function Shell() {
                 ref={settingsRef}
                 data-tauri-drag-region="noDrag"
                 role="menu"
-                aria-label="Settings"
+                aria-label={t('app.settings')}
               >
-                <div className="menu-section-title">Updates</div>
+                <div className="menu-section-title">{t('menu.updates')}</div>
                 <button
                   type="button"
                   className="menu-row menu-row--button"
@@ -335,22 +367,22 @@ function Shell() {
                     className={checking ? 'menu-spin' : undefined}
                   />
                   <span>
-                    {checking ? 'Checking for updates...' : 'Check for updates'}
+                    {checking ? t('menu.checking') : t('menu.check')}
                   </span>
                   <span className="menu-row-status">
                     {checking
                       ? ''
                       : checked
                         ? updateCount > 0
-                          ? `${updateCount} available`
-                          : 'Up to date'
+                          ? t('menu.nAvailable', [updateCount])
+                          : t('menu.upToDate')
                         : ''}
                   </span>
                 </button>
 
-                <div className="menu-section-title">Startup</div>
+                <div className="menu-section-title">{t('menu.startup')}</div>
                 <label className="menu-row" htmlFor="startup-windows">
-                  <span>Start automatically</span>
+                  <span>{t('menu.startAuto')}</span>
                   <button
                     id="startup-windows"
                     type="button"
@@ -371,7 +403,7 @@ function Shell() {
                   </button>
                 </label>
                 <label className="menu-row" htmlFor="startup-minimized">
-                  <span>Start minimized to tray</span>
+                  <span>{t('menu.startMin')}</span>
                   <button
                     id="startup-minimized"
                     type="button"
@@ -391,7 +423,7 @@ function Shell() {
                   </button>
                 </label>
                 <label className="menu-row" htmlFor="startup-close-tray">
-                  <span>Close button hides to tray</span>
+                  <span>{t('menu.closeTray')}</span>
                   <button
                     id="startup-close-tray"
                     type="button"
@@ -411,8 +443,10 @@ function Shell() {
                   </button>
                 </label>
 
-                <div className="menu-section-title">Appearance</div>
-                <div className="menu-swatches" role="radiogroup" aria-label="Theme">
+                <div className="menu-section-title">
+                  {t('menu.appearance')}
+                </div>
+                <div className="menu-swatches" role="radiogroup" aria-label={t('menu.theme')}>
                   {THEMES.map((theme) => (
                     <button
                       key={theme.id}
@@ -441,6 +475,34 @@ function Shell() {
                   ))}
                 </div>
 
+                <div className="menu-section-title">
+                  {t('menu.language')}
+                </div>
+                <div
+                  className="menu-lang"
+                  role="radiogroup"
+                  aria-label={t('menu.language')}
+                >
+                  {(['en', 'es'] as Lang[]).map((code) => (
+                    <button
+                      key={code}
+                      type="button"
+                      role="radio"
+                      aria-checked={lang === code}
+                      className={`menu-lang-btn${
+                        lang === code ? ' menu-lang-btn--active' : ''
+                      }`}
+                      onClick={() => {
+                        void patchSettings({ language: code }).then((next) => {
+                          if (next) setLang(code);
+                        });
+                      }}
+                    >
+                      {code === 'en' ? 'English' : 'Español'}
+                    </button>
+                  ))}
+                </div>
+
                 <div className="menu-footer">
                   LumaForge Panel {appVersion ? `v${appVersion}` : ''}
                 </div>
@@ -453,9 +515,11 @@ function Shell() {
                 ref={updatesRef}
                 data-tauri-drag-region="noDrag"
                 role="menu"
-                aria-label="Updates"
+                aria-label={t('menu.updates')}
               >
-                <div className="menu-section-title">Updates available</div>
+                <div className="menu-section-title">
+                  {t('updates.available')}
+                </div>
 
                 {updater && (
                   <div className="menu-update-row">
@@ -470,8 +534,8 @@ function Shell() {
                       onClick={() => void runPanelUpdate()}
                     >
                       {panelUpdating
-                        ? (panelProgress ?? 'WORKING...')
-                        : 'UPDATE'}
+                        ? (panelProgress ?? t('ui.working'))
+                        : t('ui.update')}
                     </button>
                   </div>
                 )}
@@ -480,7 +544,7 @@ function Shell() {
                   <div className="menu-update-row" key={tool.id}>
                     <span className="menu-update-copy">
                       <strong>{tool.name}</strong>
-                      <span>{tool.latestVersion ?? 'new release'}</span>
+                      <span>{tool.latestVersion ?? t('updates.newRelease')}</span>
                     </span>
                     <button
                       type="button"
@@ -488,7 +552,7 @@ function Shell() {
                       disabled={toolBusy !== null}
                       onClick={() => void runToolUpdate(tool.id)}
                     >
-                      {toolBusy === tool.id ? 'WORKING...' : 'UPDATE'}
+                      {toolBusy === tool.id ? t('ui.working') : t('ui.update')}
                     </button>
                   </div>
                 ))}
@@ -504,10 +568,10 @@ function Shell() {
 
       <ConfirmModal
         open={closeModalOpen}
-        title="Close LumaForge Panel"
-        description="Minimize to the system tray to keep the panel handy, or close the application completely?"
-        confirmLabel="CLOSE APP"
-        cancelLabel="MINIMIZE TO TRAY"
+        title={t('close.title')}
+        description={t('close.desc')}
+        confirmLabel={t('close.confirm')}
+        cancelLabel={t('close.cancel')}
         tone="warning"
         autoFocus="cancel"
         onCancel={() => {
@@ -525,9 +589,11 @@ function Shell() {
 
 function App() {
   return (
-    <ToastProvider>
-      <Shell />
-    </ToastProvider>
+    <I18nProvider>
+      <ToastProvider>
+        <Shell />
+      </ToastProvider>
+    </I18nProvider>
   );
 }
 

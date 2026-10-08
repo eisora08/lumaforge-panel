@@ -349,10 +349,10 @@ pub fn get_state() -> ThemesState {
 
 fn validate_theme(id: &str) -> Result<(), String> {
     if id.is_empty() || id.contains('/') || id.contains('\\') || id.contains("..") {
-        return Err("Invalid theme name".to_string());
+        return Err(crate::i18n::t("theme.invalid_name", &[]));
     }
     if !themes_dir().join(id).join("skin.json").is_file() {
-        return Err(format!("Theme '{id}' is not installed"));
+        return Err(crate::i18n::t("theme.not_installed", &[id]));
     }
     Ok(())
 }
@@ -371,25 +371,25 @@ fn sync_proxy() -> std::result::Result<(), ()> {
     }
 }
 
-const SYNC_SUFFIX: &str = "\u{2014} applies when Steam next launches";
+fn sync_suffix() -> String { crate::i18n::t("theme.sync_suffix", &[]) }
 
 pub fn activate(id: &str) -> Result<PanelResult, String> {
     validate_theme(id)?;
     set_active_name(id)?;
-    let suffix = if sync_proxy().is_ok() { "" } else { SYNC_SUFFIX };
+    let suffix = if sync_proxy().is_ok() { String::new() } else { sync_suffix() };
     Ok(PanelResult {
         ok: true,
-        message: format!("Theme '{id}' activated{suffix}"),
+        message: crate::i18n::t("theme.activated", &[id, &suffix]),
         restart_required: false,
     })
 }
 
 pub fn deactivate() -> Result<PanelResult, String> {
     set_active_name("")?;
-    let suffix = if sync_proxy().is_ok() { "" } else { SYNC_SUFFIX };
+    let suffix = if sync_proxy().is_ok() { String::new() } else { sync_suffix() };
     Ok(PanelResult {
         ok: true,
-        message: format!("Theming disabled{suffix}"),
+        message: crate::i18n::t("theme.disabled", &[&suffix]),
         restart_required: false,
     })
 }
@@ -397,10 +397,10 @@ pub fn deactivate() -> Result<PanelResult, String> {
 pub fn set_condition(theme_id: &str, key: &str, value: &str) -> Result<PanelResult, String> {
     validate_theme(theme_id)?;
     write_condition(theme_id, key, Some(value))?;
-    let suffix = if sync_proxy().is_ok() { "" } else { SYNC_SUFFIX };
+    let suffix = if sync_proxy().is_ok() { String::new() } else { sync_suffix() };
     Ok(PanelResult {
         ok: true,
-        message: format!("Condition updated{suffix}"),
+        message: crate::i18n::t("theme.condition_updated", &[&suffix]),
         restart_required: false,
     })
 }
@@ -408,10 +408,10 @@ pub fn set_condition(theme_id: &str, key: &str, value: &str) -> Result<PanelResu
 pub fn reset_condition(theme_id: &str, key: &str) -> Result<PanelResult, String> {
     validate_theme(theme_id)?;
     write_condition(theme_id, key, None)?;
-    let suffix = if sync_proxy().is_ok() { "" } else { SYNC_SUFFIX };
+    let suffix = if sync_proxy().is_ok() { String::new() } else { sync_suffix() };
     Ok(PanelResult {
         ok: true,
-        message: format!("Condition reset{suffix}"),
+        message: crate::i18n::t("theme.condition_reset", &[&suffix]),
         restart_required: false,
     })
 }
@@ -451,7 +451,7 @@ fn ipc_sync() -> Result<String, String> {
         }
     }
     if handle == INVALID_HANDLE_VALUE {
-        return Err("CDP proxy is not running".to_string());
+        return Err(crate::i18n::t("err.cdp_not_running", &[]));
     }
 
     let cmd = b"sync-theme";
@@ -482,7 +482,7 @@ fn ipc_sync() -> Result<String, String> {
     unsafe { CloseHandle(handle) };
 
     if ok == 0 || read == 0 {
-        return Err("No response from CDP proxy".to_string());
+        return Err(crate::i18n::t("err.cdp_no_response", &[]));
     }
     Ok(String::from_utf8_lossy(&buffer[..read as usize]).into_owned())
 }
@@ -494,7 +494,7 @@ fn ipc_sync() -> Result<String, String> {
     use std::time::Duration;
 
     let mut stream = UnixStream::connect("/tmp/lumalite_core.sock")
-        .map_err(|e| format!("CDP proxy is not running: {e}"))?;
+        .map_err(|e| format!("{}: {e}", crate::i18n::t("err.cdp_not_running", &[])))?;
     stream
         .set_read_timeout(Some(Duration::from_secs(1)))
         .map_err(|e| e.to_string())?;
@@ -504,14 +504,14 @@ fn ipc_sync() -> Result<String, String> {
     let mut buffer = [0u8; 1024];
     let read = stream.read(&mut buffer).map_err(|e| e.to_string())?;
     if read == 0 {
-        return Err("No response from CDP proxy".to_string());
+        return Err(crate::i18n::t("err.cdp_no_response", &[]));
     }
     Ok(String::from_utf8_lossy(&buffer[..read]).into_owned())
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "linux")))]
 fn ipc_sync() -> Result<String, String> {
-    Err("IPC not supported on this platform".to_string())
+    Err(crate::i18n::t("err.ipc_unsupported", &[]))
 }
 
 // ---------------------------------------------------------------------------

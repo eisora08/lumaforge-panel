@@ -70,11 +70,14 @@ export interface AppearanceSettings {
 export interface PanelSettings {
   startup: StartupSettings;
   appearance: AppearanceSettings;
+  /** UI language: 'en', 'es' or '' (auto-detect on first run). */
+  language: string;
 }
 
 export interface PartialSettings {
   startup?: Partial<StartupSettings>;
   appearance?: Partial<AppearanceSettings>;
+  language?: string;
 }
 
 // ---------------------------------------------------------------------------

@@ -24,8 +24,8 @@ pub fn init_system_tray(app: &mut App) -> tauri::Result<()> {
         None => tauri::image::Image::new_owned(TRAY_ICON_RGBA.to_vec(), 16, 16),
     };
 
-    let open_item = MenuItemBuilder::with_id("open", "Open LumaForge Panel").build(handle)?;
-    let quit_item = MenuItemBuilder::with_id("quit", "Quit").build(handle)?;
+    let open_item = MenuItemBuilder::with_id("open", crate::i18n::t("tray.open", &[])).build(handle)?;
+    let quit_item = MenuItemBuilder::with_id("quit", crate::i18n::t("tray.quit", &[])).build(handle)?;
     let separator = PredefinedMenuItem::separator(handle)?;
 
     let menu = MenuBuilder::new(handle)

@@ -8500,6 +8500,45 @@ html[data-window-maximized="true"] .app-shell {
   outline-offset: 2px;
 }
 
+.menu-lang {
+  display: flex;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-2) var(--sp-2);
+}
+
+.menu-lang-btn {
+  flex: 1;
+  min-height: 28px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.menu-lang-btn:hover {
+  border-color: var(--text-muted);
+  background: var(--surface-card-hover, rgba(255, 255, 255, 0.05));
+}
+
+.menu-lang-btn--active {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 35%, transparent);
+}
+
+.menu-lang-btn:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+
 .menu-update-row {
   display: flex;
   align-items: center;
@@ -8793,6 +8832,32 @@ html[data-window-maximized="true"] .app-shell {
   flex-shrink: 0;
 }
 
+.panel-component-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised, rgba(255, 255, 255, 0.04));
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.panel-component-remove:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--red, #ef4444) 55%, transparent);
+  background: color-mix(in srgb, var(--red-muted, #ef4444) 14%, transparent);
+  color: var(--red, #ef4444);
+}
+
+.panel-component-remove:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .panel-component-toggle {
   flex-shrink: 0;
 }
@@ -8914,23 +8979,28 @@ html[data-window-maximized="true"] .app-shell {
   transition: all var(--duration-fast) var(--ease-out);
 }
 
-.panel-themes-rail-btn:hover {
+.panel-themes-rail-btn:hover:not(:disabled) {
   border-color: var(--border-strong);
   color: var(--text-primary);
+}
+
+.panel-themes-rail-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.panel-themes-rail-btn:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
 }
 
 .panel-themes-rail {
   display: flex;
   gap: var(--sp-3);
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
+  overflow-x: hidden;
   padding: 2px;
   min-width: 0;
   flex: 1;
-}
-
-.panel-themes-rail::-webkit-scrollbar {
-  height: 4px;
 }
 
 .panel-theme-card {
@@ -8945,7 +9015,6 @@ html[data-window-maximized="true"] .app-shell {
   border-radius: var(--radius-md);
   background: var(--surface-input);
   cursor: pointer;
-  scroll-snap-align: start;
   text-align: left;
   transition: all var(--duration-fast) var(--ease-out);
 }
@@ -9030,47 +9099,10 @@ html[data-window-maximized="true"] .app-shell {
   margin-top: -4px;
 }
 
-/* Detail strip ----------------------------------------------------------- */
+/* Detail strip (removed — APPLY/gear live in the card header) ------------ */
 
-.panel-themes-detail {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-  border-top: 1px solid var(--border-subtle);
-  padding-top: var(--sp-3);
-}
-
-.panel-themes-detail-head {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-}
-
-.panel-themes-detail-copy {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  flex: 1;
-}
-
-.panel-themes-detail-title {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  color: var(--text-primary);
-}
-
-.panel-themes-detail-chip {
-  margin-top: 0;
-}
-
-.panel-themes-detail-sub {
-  font-size: var(--text-xs);
-  color: var(--text-muted);
-  line-height: 1.4;
+.panel-themes-apply {
+  flex-shrink: 0;
 }
 
 .panel-themes-conditions {
@@ -9185,10 +9217,6 @@ html[data-window-maximized="true"] .app-shell {
   cursor: default;
 }
 /* Theme settings sidepanel ----------------------------------------------- */
-
-.panel-themes-gear {
-  flex-shrink: 0;
-}
 
 .theme-panel-layer {
   position: fixed;
