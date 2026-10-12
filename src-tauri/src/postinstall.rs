@@ -334,6 +334,43 @@ fn slssteam_setup(steam_root: &Path) -> Result<(), String> {
             .map_err(|e| format!("{}", crate::i18n::t("err.create_dir", &["config.yaml", &e.to_string()])))?;
     }
 
+    deploy_slssteam_plugins()?;
+
+    Ok(())
+}
+
+/// Write the bundled SLSsteam Lua plugins, replacing files whose content
+/// differs. Needed for the in-library download flow (`Plugins: yes`).
+fn deploy_slssteam_plugins() -> Result<(), String> {
+    let plugins_dir = slssteam_config_path()
+        .parent()
+        .map(|p| p.join("plugins"))
+        .ok_or_else(|| "config path has no parent".to_string())?;
+    fs::create_dir_all(&plugins_dir).map_err(|e| {
+        format!("{}", crate::i18n::t("err.create_dir", &[&plugins_dir.display().to_string(), &e.to_string()]))
+    })?;
+
+    for (name, content) in [
+        (
+            "download.lua",
+            include_str!("slssteam_plugins/download.lua"),
+        ),
+        (
+            "spliced-tickets.lua",
+            include_str!("slssteam_plugins/spliced-tickets.lua"),
+        ),
+    ] {
+        let path = plugins_dir.join(name);
+        let changed = match fs::read_to_string(&path) {
+            Ok(existing) => existing != content,
+            Err(_) => true,
+        };
+        if changed {
+            fs::write(&path, content).map_err(|e| {
+                format!("{}", crate::i18n::t("err.write", &[name, &e.to_string()]))
+            })?;
+        }
+    }
     Ok(())
 }
 
@@ -406,6 +443,8 @@ CDKeys:
 FakeOffline:
 FakeAppIds:
 ManifestIds:
+AdditionalDepots:
+DecryptionKeys:
 DepotBlacklist:
 GameTitles:
 SubscriptionTimestamps:
@@ -418,7 +457,7 @@ SafeMode: no
 WarnHashMissmatch: no
 NotifyInit: yes
 API: yes
-Plugins: no
+Plugins: yes
 DisableCloud: yes
 DisableUpdates: yes
 FakeName: ""
