@@ -11,10 +11,14 @@ use crate::paths;
 pub enum PostInstall {
     /// OpenSteamTool: `{steam}/config/lua` + seed/patch `{steam}/opensteamtool.toml`.
     SetupOst,
-    /// CloudRedirect: set `[cloud] enabled = true` in `{steam}/opensteamtool.toml`.
+    /// CloudRedirect (Windows): set `[cloud] enabled = true` in
+    /// `{steam}/opensteamtool.toml`.
     PatchOstToml,
     /// SLSsteam: patch steam.sh with LD_AUDIT, write steam.cfg, seed config.yaml.
     SlssteamSetup,
+    /// CloudRedirect (Linux): require SLSsteam, flip `DisableCloud: no` in its
+    /// config and add cloud_redirect.so to the steam.sh LD_AUDIT chain.
+    CloudRedirectSetup,
 }
 
 pub fn run_all(hooks: &[PostInstall], steam_root: &Path) -> Result<(), String> {
@@ -29,17 +33,21 @@ pub fn run(hook: PostInstall, steam_root: &Path) -> Result<(), String> {
         PostInstall::SetupOst => setup_ost(steam_root),
         PostInstall::PatchOstToml => patch_opensteamtool_cloud_enabled(steam_root).map(|_| ()),
         PostInstall::SlssteamSetup => slssteam_setup(steam_root),
+        PostInstall::CloudRedirectSetup => cloud_redirect_setup(steam_root),
     }
 }
 
-/// Toggle-time counterpart of [`run_all`]: `SlssteamSetup` must be undone when
-/// the tool is switched off (remove the LD_AUDIT line again).
+/// Toggle-time counterpart of [`run_all`]: the LD_AUDIT chain must be
+/// rebuilt when a tool that participates in it is switched off (its files
+/// are already `.bak` by the time this runs).
 pub fn on_toggle(hooks: &[PostInstall], enable: bool, steam_root: &Path) -> Result<(), String> {
     if enable {
         return run_all(hooks, steam_root);
     }
-    if hooks.contains(&PostInstall::SlssteamSetup) {
-        strip_ld_audit(steam_root)?;
+    if hooks.contains(&PostInstall::SlssteamSetup)
+        || hooks.contains(&PostInstall::CloudRedirectSetup)
+    {
+        sync_ld_audit(steam_root)?;
     }
     Ok(())
 }
@@ -299,22 +307,18 @@ fn slssteam_setup(steam_root: &Path) -> Result<(), String> {
         return Err(crate::i18n::t("err.steam_sh_missing", &[]));
     }
 
-    let slssteam_so =
-        find_slssteam_file("SLSsteam.so").ok_or_else(|| crate::i18n::t("err.slssteam_missing", &[]))?;
-    let library_inject = find_slssteam_file("library-inject.so")
+    find_slssteam_file("SLSsteam.so").ok_or_else(|| crate::i18n::t("err.slssteam_missing", &[]))?;
+    find_slssteam_file("library-inject.so")
         .ok_or_else(|| crate::i18n::t("err.library_inject_missing", &[]))?;
-    let ld_audit = format!("{}:{}", library_inject.display(), slssteam_so.display());
 
-    let content = fs::read_to_string(&steam_sh)
-        .map_err(|e| format!("{}", crate::i18n::t("err.read", &["steam.sh", &e.to_string()])))?;
-
+    // Backup once before the first patch, then rebuild the chain from disk
+    // (covers a CloudRedirect that was installed before or after SLSsteam).
     let backup = steam_root.join("steam.sh.bak");
     if !backup.exists() {
         fs::copy(&steam_sh, &backup)
             .map_err(|e| format!("{}", crate::i18n::t("err.create_dir", &["steam.sh.bak", &e.to_string()])))?;
     }
-
-    write_patched_steam_sh(&steam_sh, &content, Some(&ld_audit))?;
+    sync_ld_audit(steam_root)?;
 
     // Block client self-updates so the LD_AUDIT patch survives.
     fs::write(
@@ -428,6 +432,131 @@ fn strip_ld_audit(steam_root: &Path) -> Result<(), String> {
         return Ok(());
     }
     write_patched_steam_sh(&steam_sh, &content, None)
+}
+
+/// Rebuild the `export LD_AUDIT=` line in steam.sh from the components that
+/// are currently live on disk: SLSsteam (library-inject + SLSsteam.so) and
+/// CloudRedirect's cloud_redirect.so. An empty set strips the line entirely.
+/// Called by SlssteamSetup, CloudRedirectSetup and toggle-off so the chain
+/// always reflects reality regardless of install/enable order.
+fn sync_ld_audit(steam_root: &Path) -> Result<(), String> {
+    let steam_sh = steam_root.join("steam.sh");
+    if !steam_sh.exists() {
+        // Nothing to wire; a missing steam.sh surfaces from the setup hooks.
+        return Ok(());
+    }
+
+    let mut chain: Vec<String> = Vec::new();
+    if let (Some(inject), Some(sls)) = (
+        find_slssteam_file("library-inject.so"),
+        find_slssteam_file("SLSsteam.so"),
+    ) {
+        chain.push(inject.display().to_string());
+        chain.push(sls.display().to_string());
+    }
+    if let Some(cr) = find_cloud_redirect_so() {
+        chain.push(cr.display().to_string());
+    }
+
+    if chain.is_empty() {
+        // Only strip when a line is actually present — avoids a pointless
+        // rewrite of steam.sh on systems that never had the patch.
+        let content = fs::read_to_string(&steam_sh)
+            .map_err(|e| format!("{}", crate::i18n::t("err.read", &["steam.sh", &e.to_string()])))?;
+        if content.contains("export LD_AUDIT=") {
+            return strip_ld_audit(steam_root);
+        }
+        return Ok(());
+    }
+
+    let content = fs::read_to_string(&steam_sh)
+        .map_err(|e| format!("{}", crate::i18n::t("err.read", &["steam.sh", &e.to_string()])))?;
+    let ld = chain.join(":");
+    if content.contains(&format!("export LD_AUDIT={ld}")) {
+        return Ok(());
+    }
+    write_patched_steam_sh(&steam_sh, &content, Some(&ld))
+}
+
+/// Live (non-`.bak`) CloudRedirect library in the official Linux location —
+/// where headcrab and this panel deploy it (loaded via LD_AUDIT).
+fn find_cloud_redirect_so() -> Option<PathBuf> {
+    if !cfg!(target_os = "linux") {
+        return None;
+    }
+    let path = dirs::home_dir()?
+        .join(".local/share/CloudRedirect")
+        .join("cloud_redirect.so");
+    path.exists().then_some(path)
+}
+
+// ---------------------------------------------------------------------------
+// CloudRedirectSetup (Linux)
+// ---------------------------------------------------------------------------
+
+/// CloudRedirect on Linux loads through the LD_AUDIT chain that SLSsteam
+/// establishes, and only functions while SLSsteam keeps cloud enabled —
+/// `DisableCloud: no` is the same gate upstream headcrab greps for.
+fn cloud_redirect_setup(steam_root: &Path) -> Result<(), String> {
+    if !cfg!(target_os = "linux") {
+        return Ok(());
+    }
+    find_slssteam_file("SLSsteam.so")
+        .ok_or_else(|| crate::i18n::t("err.cr_needs_slssteam", &[]))?;
+    set_slssteam_disable_cloud(false)?;
+    sync_ld_audit(steam_root)
+}
+
+/// Flip `DisableCloud:` in the SLSsteam config, preserving everything else.
+fn set_slssteam_disable_cloud(cloud_disabled: bool) -> Result<(), String> {
+    let path = slssteam_config_path();
+    let value = if cloud_disabled { "yes" } else { "no" };
+    let content = if path.exists() {
+        fs::read_to_string(&path).map_err(|e| {
+            format!(
+                "{}",
+                crate::i18n::t("err.read", &[&path.display().to_string(), &e.to_string()])
+            )
+        })?
+    } else {
+        String::new()
+    };
+
+    let mut found = false;
+    let mut lines: Vec<String> = content
+        .lines()
+        .map(|line| {
+            if line.trim_start().starts_with("DisableCloud:") {
+                found = true;
+                format!("DisableCloud: {value}")
+            } else {
+                line.to_string()
+            }
+        })
+        .collect();
+    if !found {
+        lines.push(format!("DisableCloud: {value}"));
+    }
+    let mut new_content = lines.join("\n");
+    new_content.push('\n');
+
+    if new_content == content {
+        return Ok(());
+    }
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| {
+            format!(
+                "{}",
+                crate::i18n::t("err.create_dir", &[&parent.display().to_string(), &e.to_string()])
+            )
+        })?;
+    }
+    fs::write(&path, &new_content).map_err(|e| {
+        format!(
+            "{}",
+            crate::i18n::t("err.write", &[&path.display().to_string(), &e.to_string()])
+        )
+    })
 }
 
 const DEFAULT_SLSSTEAM_CONFIG: &str = r#"# SLSsteam Configuration

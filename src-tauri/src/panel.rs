@@ -107,6 +107,8 @@ fn build_status() -> PanelStatus {
             tools::DeployTarget::SteamRoot { .. } => steam_root
                 .as_ref()
                 .map(|root| root.to_string_lossy().to_string()),
+            tools::DeployTarget::HomeShare { dir, .. } => dirs::home_dir()
+                .map(|h| h.join(".local/share").join(dir).to_string_lossy().to_string()),
             tools::DeployTarget::Plugins { .. } => {
                 Some(paths::plugins_dir().to_string_lossy().to_string())
             }

@@ -49,6 +49,13 @@ const IS_LINUX: bool = cfg!(target_os = "linux");
 pub enum DeployTarget {
     /// Copy the listed relative paths into the Steam root.
     SteamRoot { files: &'static [&'static str] },
+    /// Copy the listed relative paths into `~/.local/share/{dir}` — the
+    /// Linux-native location for libraries loaded from outside the Steam
+    /// root (CloudRedirect is audited via LD_AUDIT, not placed in steam).
+    HomeShare {
+        dir: &'static str,
+        files: &'static [&'static str],
+    },
     /// Copy the whole payload into `{plugins}/{dir}`.
     Plugins { dir: &'static str },
     /// Keep everything in `thirdparty/{id}` — the tool is wired up through
@@ -88,6 +95,9 @@ impl ToolDef {
     fn root(&self, steam_root: &Path) -> Option<PathBuf> {
         match self.target {
             DeployTarget::SteamRoot { .. } => Some(steam_root.to_path_buf()),
+            DeployTarget::HomeShare { dir, .. } => {
+                Some(dirs::home_dir()?.join(".local/share").join(dir))
+            }
             DeployTarget::Plugins { .. } => Some(paths::plugins_dir()),
             DeployTarget::Payload => Some(payload_dir(self)),
         }
@@ -128,6 +138,27 @@ const CLOUD_REDIRECT_FILES: &[&str] = if IS_LINUX {
     &["cloud_redirect.so"]
 } else {
     &["cloud_redirect.dll"]
+};
+
+// Windows: the .dll is loaded from the Steam root and wired through
+// OpenSteamTool's opensteamtool.toml. Linux: the .so lives in
+// ~/.local/share/CloudRedirect, is loaded via LD_AUDIT alongside SLSsteam,
+// and needs no OST integration at all.
+const CLOUD_REDIRECT_TARGET: DeployTarget = if IS_LINUX {
+    DeployTarget::HomeShare {
+        dir: "CloudRedirect",
+        files: CLOUD_REDIRECT_FILES,
+    }
+} else {
+    DeployTarget::SteamRoot {
+        files: CLOUD_REDIRECT_FILES,
+    }
+};
+
+const CLOUD_REDIRECT_POST: &[PostInstall] = if IS_LINUX {
+    &[PostInstall::CloudRedirectSetup]
+} else {
+    &[PostInstall::PatchOstToml]
 };
 
 pub const TOOL_DEFS: &[ToolDef] = &[
@@ -187,12 +218,10 @@ pub const TOOL_DEFS: &[ToolDef] = &[
         preferred_asset: CLOUD_REDIRECT_ASSET,
         preferred_asset_contains: None,
         platform: Platform::All,
-        target: DeployTarget::SteamRoot {
-            files: CLOUD_REDIRECT_FILES,
-        },
+        target: CLOUD_REDIRECT_TARGET,
         toggle: CLOUD_REDIRECT_FILES,
         installed: CLOUD_REDIRECT_FILES,
-        post_install: &[PostInstall::PatchOstToml],
+        post_install: CLOUD_REDIRECT_POST,
     },
     ToolDef {
         id: "slssteam",
@@ -390,7 +419,10 @@ fn set_enabled_inner(app: &tauri::AppHandle, def: &ToolDef, enable: bool) -> Res
     };
 
     let mut restart_required = false;
-    let is_steam_root_deploy = matches!(def.target, DeployTarget::SteamRoot { .. });
+    let is_steam_root_deploy = matches!(
+        def.target,
+        DeployTarget::SteamRoot { .. } | DeployTarget::HomeShare { .. }
+    );
 
     if is_steam_root_deploy && steam::is_steam_running() {
         steam::ensure_steam_stopped()?;
@@ -488,6 +520,42 @@ fn deploy(app: &tauri::AppHandle, def: &ToolDef, src: &Path) -> Result<bool, Str
             std::fs::create_dir_all(&dst).map_err(|e| e.to_string())?;
             github::copy_dir_recursive(src, &dst)?;
             Ok(false)
+        }
+        DeployTarget::HomeShare { dir, files } => {
+            let Some(home_share_root) =
+                dirs::home_dir().map(|h| h.join(".local/share").join(dir))
+            else {
+                return Err(crate::i18n::t("err.deploy_root", &[]));
+            };
+            emit_progress(app, "deploy", crate::i18n::t("progress.deploy_steam", &[]));
+
+            // The library is LD_AUDIT-loaded into a running Steam — replacing
+            // the file in place would hit ETXTBSY, so stop Steam first.
+            let mut restart_required = false;
+            if steam::is_steam_running() {
+                steam::ensure_steam_stopped()?;
+                restart_required = true;
+            }
+
+            std::fs::create_dir_all(&home_share_root).map_err(|e| e.to_string())?;
+            let mut errors: Vec<String> = Vec::new();
+            for rel in files {
+                let from = resolve_rel(src, rel);
+                if !from.exists() {
+                    errors.push(crate::i18n::t("err.release_missing", &[rel]));
+                    continue;
+                }
+                if let Err(e) = copy_entry(&from, &home_share_root.join(rel)) {
+                    errors.push(e);
+                }
+            }
+            if !errors.is_empty() {
+                return Err(crate::i18n::t(
+                    "err.deploy",
+                    &[def.name, &errors.join("; ")],
+                ));
+            }
+            Ok(restart_required)
         }
         DeployTarget::SteamRoot { files } => {
             let steam_root = paths::detect_steam_root()
@@ -609,7 +677,10 @@ pub fn uninstall(def: &ToolDef) -> Result<(String, bool), String> {
     };
 
     let mut restart_required = false;
-    let is_steam_root_deploy = matches!(def.target, DeployTarget::SteamRoot { .. });
+    let is_steam_root_deploy = matches!(
+        def.target,
+        DeployTarget::SteamRoot { .. } | DeployTarget::HomeShare { .. }
+    );
 
     if is_steam_root_deploy && steam::is_steam_running() {
         steam::ensure_steam_stopped()?;
@@ -621,9 +692,11 @@ pub fn uninstall(def: &ToolDef) -> Result<(String, bool), String> {
     if !def.post_install.is_empty() {
         postinstall::on_toggle(def.post_install, false, &steam_root)?;
         if def.post_install.contains(&PostInstall::SlssteamSetup)
-            && steam::is_steam_running()
+            || def.post_install.contains(&PostInstall::CloudRedirectSetup)
         {
-            restart_required = true;
+            if steam::is_steam_running() {
+                restart_required = true;
+            }
         }
     }
 
@@ -642,6 +715,24 @@ pub fn uninstall(def: &ToolDef) -> Result<(String, bool), String> {
             }
             for rel in rels {
                 if let Err(e) = remove_deployed(&steam_root, rel) {
+                    errors.push(e);
+                }
+            }
+        }
+        DeployTarget::HomeShare { dir, files } => {
+            let Some(home_share_root) =
+                dirs::home_dir().map(|h| h.join(".local/share").join(dir))
+            else {
+                return Err(crate::i18n::t("err.deploy_root", &[]));
+            };
+            let mut rels: Vec<&str> = files.to_vec();
+            for rel in def.toggle.iter().chain(def.installed.iter()) {
+                if !rels.contains(rel) {
+                    rels.push(rel);
+                }
+            }
+            for rel in rels {
+                if let Err(e) = remove_deployed(&home_share_root, rel) {
                     errors.push(e);
                 }
             }
