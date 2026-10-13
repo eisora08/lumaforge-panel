@@ -390,31 +390,66 @@ fn slssteam_config_path() -> PathBuf {
     }
 }
 
-/// Rewrite steam.sh dropping any previous `export LD_AUDIT=` line and
-/// inserting the given one after line 10 (`None` = just strip).
-fn write_patched_steam_sh(path: &Path, content: &str, ld_audit: Option<&str>) -> Result<(), String> {
+/// A steam.sh line this panel owns (and may rewrite): the SLSsteam audit
+/// chain or a CloudRedirect preload. Only our own preload line is matched so
+/// an unrelated user `LD_PRELOAD` is left alone.
+fn is_our_export(line: &str) -> bool {
+    line.contains("export LD_AUDIT=")
+        || (line.contains("export LD_PRELOAD=") && line.contains("cloud_redirect"))
+}
+
+/// Rewrite steam.sh dropping any previous panel `export LD_AUDIT=` /
+/// `export LD_PRELOAD=` line and inserting the given ones before the last
+/// `source ` line, or after line 10 when there is none (`None`/`None` = just
+/// strip). The two stay separate on purpose: `cloud_redirect.so` is a normal
+/// preload library linking against `libsc.so.6` (only resolvable inside a
+/// running Steam), not a glibc audit library like `library-inject.so`.
+fn write_patched_steam_sh(
+    path: &Path,
+    content: &str,
+    ld_audit: Option<&str>,
+    ld_preload: Option<&str>,
+) -> Result<(), String> {
     let lines: Vec<&str> = content.lines().collect();
     let mut new_lines: Vec<String> = Vec::new();
+
+    let mut exports: Vec<String> = Vec::new();
+    if let Some(a) = ld_audit {
+        exports.push(format!("export LD_AUDIT={a}"));
+    }
+    if let Some(p) = ld_preload {
+        exports.push(format!("export LD_PRELOAD={p}"));
+    }
+
+    // Headcrab-style launchers re-export their INJECT_* vars inside
+    // GameLauncher right before `source <client>` — an early (line 10) export
+    // gets clobbered at runtime and Steam starts without the chain. Land
+    // immediately before the last `source ` line so ours are the final values
+    // the client inherits. Stock Valve steam.sh has no `source` lines
+    // (verified) and keeps the historical after-line-10 spot — its launch is a
+    // direct call that inherits the script environment anywhere.
+    let source_at = lines
+        .iter()
+        .rposition(|l| l.trim_start().starts_with("source "));
     let mut inserted = false;
 
     for (i, line) in lines.iter().enumerate() {
-        if line.contains("export LD_AUDIT=") {
+        if is_our_export(line) {
             continue;
         }
+        if !inserted && !exports.is_empty() && Some(i) == source_at {
+            new_lines.extend(exports.iter().cloned());
+            inserted = true;
+        }
         new_lines.push(line.to_string());
-
-        if let Some(ld) = ld_audit {
-            if !inserted && i == 9 {
-                new_lines.push(format!("export LD_AUDIT={ld}"));
-                inserted = true;
-            }
+        if !inserted && !exports.is_empty() && source_at.is_none() && i == 9 {
+            new_lines.extend(exports.iter().cloned());
+            inserted = true;
         }
     }
 
-    if let Some(ld) = ld_audit {
-        if !inserted {
-            new_lines.push(format!("export LD_AUDIT={ld}"));
-        }
+    if !inserted && !exports.is_empty() {
+        new_lines.extend(exports.iter().cloned());
     }
 
     write_sh_force(path, &new_lines.join("\n"))
@@ -462,17 +497,17 @@ fn strip_ld_audit(steam_root: &Path) -> Result<(), String> {
     }
     let content = fs::read_to_string(&steam_sh)
         .map_err(|e| format!("{}", crate::i18n::t("err.read", &["steam.sh", &e.to_string()])))?;
-    if !content.contains("export LD_AUDIT=") {
+    if !content.lines().any(is_our_export) {
         return Ok(());
     }
-    write_patched_steam_sh(&steam_sh, &content, None)
+    write_patched_steam_sh(&steam_sh, &content, None, None)
 }
 
-/// Rebuild the `export LD_AUDIT=` line in steam.sh from the components that
-/// are currently live on disk: SLSsteam (library-inject + SLSsteam.so) and
-/// CloudRedirect's cloud_redirect.so. An empty set strips the line entirely.
-/// Called by SlssteamSetup, CloudRedirectSetup and toggle-off so the chain
-/// always reflects reality regardless of install/enable order.
+/// Rebuild the panel's `export LD_AUDIT=` (SLSsteam audit chain) and
+/// `export LD_PRELOAD=` (CloudRedirect) lines in steam.sh from the components
+/// currently live on disk. An empty set strips the lines entirely. Called by
+/// SlssteamSetup, CloudRedirectSetup and toggle-off so the wiring always
+/// reflects reality regardless of install/enable order.
 fn sync_ld_audit(steam_root: &Path) -> Result<(), String> {
     let steam_sh = steam_root.join("steam.sh");
     if !steam_sh.exists() {
@@ -480,40 +515,50 @@ fn sync_ld_audit(steam_root: &Path) -> Result<(), String> {
         return Ok(());
     }
 
-    let mut chain: Vec<String> = Vec::new();
+    let mut audit: Vec<String> = Vec::new();
     if let (Some(inject), Some(sls)) = (
         find_slssteam_file("library-inject.so"),
         find_slssteam_file("SLSsteam.so"),
     ) {
-        chain.push(inject.display().to_string());
-        chain.push(sls.display().to_string());
+        audit.push(inject.display().to_string());
+        audit.push(sls.display().to_string());
     }
-    if let Some(cr) = find_cloud_redirect_so() {
-        chain.push(cr.display().to_string());
-    }
+    let preload = find_cloud_redirect_so().map(|p| p.display().to_string());
 
-    if chain.is_empty() {
-        // Only strip when a line is actually present — avoids a pointless
-        // rewrite of steam.sh on systems that never had the patch.
-        let content = fs::read_to_string(&steam_sh)
-            .map_err(|e| format!("{}", crate::i18n::t("err.read", &["steam.sh", &e.to_string()])))?;
-        if content.contains("export LD_AUDIT=") {
+    let content = fs::read_to_string(&steam_sh)
+        .map_err(|e| format!("{}", crate::i18n::t("err.read", &["steam.sh", &e.to_string()])))?;
+
+    if audit.is_empty() && preload.is_none() {
+        // Only strip when a panel line is actually present — avoids a
+        // pointless rewrite on systems that never had the patch.
+        if content.lines().any(is_our_export) {
             return strip_ld_audit(steam_root);
         }
         return Ok(());
     }
 
-    let content = fs::read_to_string(&steam_sh)
-        .map_err(|e| format!("{}", crate::i18n::t("err.read", &["steam.sh", &e.to_string()])))?;
-    let ld = chain.join(":");
-    if content.contains(&format!("export LD_AUDIT={ld}")) {
+    let want_audit = audit.join(":");
+    let has_audit = audit.is_empty() || content.contains(&format!("export LD_AUDIT={want_audit}"));
+    let has_preload = preload
+        .as_ref()
+        .map(|p| content.contains(&format!("export LD_PRELOAD={p}")))
+        .unwrap_or(true);
+    if has_audit && has_preload {
         return Ok(());
     }
-    write_patched_steam_sh(&steam_sh, &content, Some(&ld))
+
+    let preload_ref = preload.as_deref();
+    write_patched_steam_sh(
+        &steam_sh,
+        &content,
+        (!audit.is_empty()).then_some(want_audit.as_str()),
+        preload_ref,
+    )
 }
 
 /// Live (non-`.bak`) CloudRedirect library in the official Linux location —
-/// where headcrab and this panel deploy it (loaded via LD_AUDIT).
+/// where headcrab and this panel deploy it (loaded via LD_PRELOAD, not
+/// LD_AUDIT: it is a normal library linking against Steam's libsc.so.6).
 fn find_cloud_redirect_so() -> Option<PathBuf> {
     if !cfg!(target_os = "linux") {
         return None;
@@ -528,8 +573,8 @@ fn find_cloud_redirect_so() -> Option<PathBuf> {
 // CloudRedirectSetup (Linux)
 // ---------------------------------------------------------------------------
 
-/// CloudRedirect on Linux loads through the LD_AUDIT chain that SLSsteam
-/// establishes, and only functions while SLSsteam keeps cloud enabled —
+/// CloudRedirect on Linux is LD_PRELOAD-injected alongside the SLSsteam
+/// LD_AUDIT chain, and only functions while SLSsteam keeps cloud enabled —
 /// `DisableCloud: no` is the same gate upstream headcrab greps for.
 fn cloud_redirect_setup(steam_root: &Path) -> Result<(), String> {
     if !cfg!(target_os = "linux") {
@@ -651,11 +696,17 @@ mod tests {
         fs::write(&path, before).unwrap();
         fs::set_permissions(&path, std::fs::Permissions::from_mode(0o555)).unwrap();
 
-        write_patched_steam_sh(&path, before, Some("/opt/sls/library-inject.so:/opt/sls/SLSsteam.so"))
-            .unwrap();
+        write_patched_steam_sh(
+            &path,
+            before,
+            Some("/opt/sls/library-inject.so:/opt/sls/SLSsteam.so"),
+            Some("/opt/cr/cloud_redirect.so"),
+        )
+        .unwrap();
 
         let content = fs::read_to_string(&path).unwrap();
         assert!(content.contains("export LD_AUDIT=/opt/sls/library-inject.so:/opt/sls/SLSsteam.so"));
+        assert!(content.contains("export LD_PRELOAD=/opt/cr/cloud_redirect.so"));
         let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o7777;
         assert_eq!(mode, 0o555);
         let _ = fs::remove_file(&path);
@@ -664,17 +715,92 @@ mod tests {
     #[test]
     fn steam_sh_write_keeps_writable_mode_and_strips_old_line() {
         let path = temp_sh("writable.sh");
-        let before = "#!/bin/bash\nexport LD_AUDIT=/old/chain.so\necho hi\n";
+        let before = concat!(
+            "#!/bin/bash\n",
+            "export LD_AUDIT=/old/chain.so\n",
+            "export LD_PRELOAD=/old/cr/cloud_redirect.so\n",
+            "echo hi\n",
+        );
         fs::write(&path, before).unwrap();
         fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
 
-        write_patched_steam_sh(&path, before, Some("/new/chain.so")).unwrap();
+        write_patched_steam_sh(&path, before, Some("/new/audit.so"), Some("/new/cr.so")).unwrap();
 
         let content = fs::read_to_string(&path).unwrap();
         assert!(!content.contains("/old/chain.so"));
-        assert!(content.contains("export LD_AUDIT=/new/chain.so"));
+        assert!(!content.contains("/old/cr/cloud_redirect.so"));
+        assert!(content.contains("export LD_AUDIT=/new/audit.so"));
+        assert!(content.contains("export LD_PRELOAD=/new/cr.so"));
         let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o7777;
         assert_eq!(mode, 0o755);
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn steam_sh_stock_spots_and_foreign_preload_survive() {
+        // Stock Valve steam.sh: no `source ` line, so both panel exports land
+        // after line 10 — and an unrelated user LD_PRELOAD (no cloud_redirect)
+        // must be left untouched.
+        let path = temp_sh("stock.sh");
+        let before = "#!/bin/bash\nline1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10\nexport LD_PRELOAD=/opt/foreign/thing.so\nrun_client\n";
+        fs::write(&path, before).unwrap();
+        fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        write_patched_steam_sh(
+            &path,
+            before,
+            Some("/opt/sls/library-inject.so:/opt/sls/SLSsteam.so"),
+            Some("/opt/cr/cloud_redirect.so"),
+        )
+        .unwrap();
+
+        let content = fs::read_to_string(&path).unwrap();
+        let line9 = content.find("line9").unwrap();
+        let audit = content.find("export LD_AUDIT=").expect("audit line present");
+        let preload = content.find("export LD_PRELOAD=/opt/cr/cloud_redirect.so").expect("preload line present");
+        let line10 = content.find("line10").unwrap();
+        let foreign = content.find("export LD_PRELOAD=/opt/foreign/thing.so").expect("foreign preload kept");
+        assert!(line9 < audit, "exports land after line 9");
+        assert!(audit < preload, "audit then preload");
+        assert!(preload < line10, "exports before line 10");
+        assert!(line10 < foreign, "foreign preload stays after line 10, untouched");
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn steam_sh_inserts_before_client_source_line() {
+        // headcrab-style launcher: GameLauncher re-exports its own INJECT_*
+        // right before sourcing the real client — the panel's exports must land
+        // after those clobbers so they are the values Steam actually inherits.
+        let path = temp_sh("headcrab.sh");
+        let before = concat!(
+            "#!/bin/bash\n",
+            "STEAM_CLIENT=\"$HOME/.steam/steam/client.sh\"\n",
+            "INJECT_SLS=\"LD_AUDIT=/sLS/library-inject.so:/sLS/SLSsteam.so\"\n",
+            "INJECT_CR=\"LD_PRELOAD=/cr/cloud_redirect.so\"\n",
+            "GameLauncher(){\n",
+            "export $INJECT_SLS\n",
+            "export $INJECT_CR\n",
+            "source $STEAM_CLIENT \"$@\"\n",
+            "}\n",
+            "steam \"$@\"\n",
+        );
+        fs::write(&path, before).unwrap();
+        fs::set_permissions(&path, std::fs::Permissions::from_mode(0o555)).unwrap();
+
+        write_patched_steam_sh(&path, before, Some("/new/audit.so"), Some("/new/cr.so")).unwrap();
+
+        let content = fs::read_to_string(&path).unwrap();
+        let clobber_sls = content.find("export $INJECT_SLS").expect("sls clobber kept");
+        let clobber_cr = content.find("export $INJECT_CR").expect("cr clobber kept");
+        let audit = content.find("export LD_AUDIT=/new/audit.so").expect("panel audit present");
+        let preload = content.find("export LD_PRELOAD=/new/cr.so").expect("panel preload present");
+        let sourced = content.find("source $STEAM_CLIENT").expect("source line kept");
+        assert!(clobber_sls < audit, "panel audit after sls clobber");
+        assert!(clobber_cr < preload, "panel preload after cr clobber");
+        assert!(preload < sourced, "panel exports before the client source");
+        let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o7777;
+        assert_eq!(mode, 0o555);
         let _ = fs::remove_file(&path);
     }
 }
