@@ -417,7 +417,41 @@ fn write_patched_steam_sh(path: &Path, content: &str, ld_audit: Option<&str>) ->
         }
     }
 
-    fs::write(path, new_lines.join("\n"))
+    write_sh_force(path, &new_lines.join("\n"))
+}
+
+/// `fs::write` for steam.sh that copes with read-only launchers: headcrab
+/// replaces steam.sh with its own script and leaves it at mode 555 (no write
+/// bit for anyone), which makes a plain write fail with EACCES. The file is
+/// user-owned, so owner-write is added for the write and the original mode
+/// restored afterwards — keeping the update protection headcrab intended.
+#[cfg(unix)]
+fn write_sh_force(path: &Path, content: &str) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let err_write = |e: &std::io::Error| {
+        format!("{}", crate::i18n::t("err.write", &["steam.sh", &e.to_string()]))
+    };
+
+    let original = fs::metadata(path).map_err(|e| err_write(&e))?.permissions();
+    let mode = original.mode() & 0o7777;
+    let read_only = mode & 0o200 == 0;
+    if read_only {
+        fs::set_permissions(path, std::fs::Permissions::from_mode(mode | 0o600))
+            .map_err(|e| err_write(&e))?;
+    }
+    let write_result = fs::write(path, content);
+    // Restore even when the write failed — a botched patch must not leave
+    // the launcher more writable than it was.
+    if read_only {
+        let _ = fs::set_permissions(path, original.clone());
+    }
+    write_result.map_err(|e| err_write(&e))
+}
+
+#[cfg(not(unix))]
+fn write_sh_force(path: &Path, content: &str) -> Result<(), String> {
+    fs::write(path, content)
         .map_err(|e| format!("{}", crate::i18n::t("err.write", &["steam.sh", &e.to_string()])))
 }
 
@@ -596,3 +630,51 @@ LogLevels: 0xff
 DumpClientInterfaces: no
 ExtendedLogging: no
 "#;
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    fn temp_sh(name: &str) -> PathBuf {
+        let mut p = std::env::temp_dir();
+        p.push(format!("lumaforge-postinstall-test-{}-{name}", std::process::id()));
+        p
+    }
+
+    #[test]
+    fn steam_sh_write_works_on_read_only_launcher() {
+        // Headcrab leaves its replaced steam.sh at mode 555 — the write must
+        // still land and the protective mode must come back untouched.
+        let path = temp_sh("readonly.sh");
+        let before = "#!/bin/bash\necho hi\n";
+        fs::write(&path, before).unwrap();
+        fs::set_permissions(&path, std::fs::Permissions::from_mode(0o555)).unwrap();
+
+        write_patched_steam_sh(&path, before, Some("/opt/sls/library-inject.so:/opt/sls/SLSsteam.so"))
+            .unwrap();
+
+        let content = fs::read_to_string(&path).unwrap();
+        assert!(content.contains("export LD_AUDIT=/opt/sls/library-inject.so:/opt/sls/SLSsteam.so"));
+        let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o7777;
+        assert_eq!(mode, 0o555);
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn steam_sh_write_keeps_writable_mode_and_strips_old_line() {
+        let path = temp_sh("writable.sh");
+        let before = "#!/bin/bash\nexport LD_AUDIT=/old/chain.so\necho hi\n";
+        fs::write(&path, before).unwrap();
+        fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        write_patched_steam_sh(&path, before, Some("/new/chain.so")).unwrap();
+
+        let content = fs::read_to_string(&path).unwrap();
+        assert!(!content.contains("/old/chain.so"));
+        assert!(content.contains("export LD_AUDIT=/new/chain.so"));
+        let mode = fs::metadata(&path).unwrap().permissions().mode() & 0o7777;
+        assert_eq!(mode, 0o755);
+        let _ = fs::remove_file(&path);
+    }
+}
