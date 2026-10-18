@@ -9,14 +9,19 @@ import {
   RefreshCw,
   RotateCcw,
   SlidersHorizontal,
+  TriangleAlert,
   X,
 } from 'lucide-react';
 import type {
+  CatalogTheme,
   ComponentState,
   PanelResult,
   ThemeCondition,
+  ThemeInfo,
+  ThemesCatalog,
   ThemesState,
 } from '../types';
+import { ConfirmModal } from './ConfirmModal';
 
 interface ThemesCardProps {
   cdpState: ComponentState;
@@ -37,6 +42,28 @@ function conditionValue(condition: ThemeCondition): string {
   return String(condition.default ?? '');
 }
 
+/** A rail entry: a catalog theme (installed or not) or a local-only theme. */
+type RailItem =
+  | { kind: 'catalog'; entry: CatalogTheme; installed: ThemeInfo | null }
+  | { kind: 'local'; theme: ThemeInfo };
+
+function itemId(item: RailItem): string {
+  return item.kind === 'catalog' ? item.entry.id : item.theme.id;
+}
+
+function itemName(item: RailItem): string {
+  return item.kind === 'catalog' ? item.entry.name : item.theme.name;
+}
+
+function itemInstalled(item: RailItem): boolean {
+  return item.kind === 'local' || item.installed !== null;
+}
+
+function itemTheme(item: RailItem | null): ThemeInfo | null {
+  if (!item) return null;
+  return item.kind === 'local' ? item.theme : item.installed;
+}
+
 export function ThemesCard({ cdpState }: ThemesCardProps) {
   const toast = useToast();
   const { t } = useI18n();
@@ -50,16 +77,35 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
     {}
   );
   const [panelOpen, setPanelOpen] = useState(false);
+  const [catalog, setCatalog] = useState<ThemesCatalog | null>(null);
+  const [previewPaths, setPreviewPaths] = useState<Record<string, string>>(
+    {}
+  );
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [uninstallTarget, setUninstallTarget] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [retrying, setRetrying] = useState(false);
 
   const railRef = useRef<HTMLDivElement | null>(null);
   const sliderTimer = useRef<number | null>(null);
+  const previewPending = useRef<Set<string>>(new Set());
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (forceCatalog = false) => {
     try {
-      const next = await invoke<ThemesState>('themes_get');
+      const [next, cat] = await Promise.all([
+        invoke<ThemesState>('themes_get'),
+        invoke<ThemesCatalog>('themes_catalog', {
+          force: forceCatalog,
+        }).catch(() => null),
+      ]);
       setState(next);
+      if (cat) setCatalog(cat);
       setSelectedId(
-        (prev) => prev ?? (next.active || next.themes[0]?.id || null)
+        (prev) =>
+          prev ??
+          (next.active || next.themes[0]?.id || cat?.entries[0]?.id || null)
       );
     } catch (error) {
       console.error('[lumaforge-panel] themes_get failed:', error);
@@ -68,12 +114,58 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
     }
   }, []);
 
+  const loadCatalog = useCallback(async (force: boolean) => {
+    try {
+      const cat = await invoke<ThemesCatalog>('themes_catalog', { force });
+      setCatalog(cat);
+    } catch {
+      setCatalog({ entries: [], source: 'empty' });
+    }
+  }, []);
+
+  const handleRetry = useCallback(async () => {
+    if (retrying) return;
+    setRetrying(true);
+    try {
+      await loadCatalog(true);
+    } finally {
+      setRetrying(false);
+    }
+  }, [loadCatalog, retrying]);
+
   useEffect(() => {
     void refresh();
     return () => {
       if (sliderTimer.current) window.clearTimeout(sliderTimer.current);
     };
   }, [refresh]);
+
+  // Cache catalog preview images on disk (one request per image; the panel
+  // serves the local copy back through the asset protocol).
+  useEffect(() => {
+    if (!catalog) return;
+    for (const entry of catalog.entries) {
+      if (
+        !entry.preview ||
+        entry.previewPath ||
+        previewPaths[entry.id] ||
+        previewPending.current.has(entry.id)
+      ) {
+        continue;
+      }
+      previewPending.current.add(entry.id);
+      void invoke<string>('theme_fetch_preview', { url: entry.preview })
+        .then((path) => {
+          setPreviewPaths((prev) => ({ ...prev, [entry.id]: path }));
+        })
+        .catch(() => {
+          // Placeholder stays; retried on the next catalog refresh.
+        })
+        .finally(() => {
+          previewPending.current.delete(entry.id);
+        });
+    }
+  }, [catalog, previewPaths]);
 
   // Close the settings panel on Escape.
   useEffect(() => {
@@ -120,11 +212,30 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
     [refresh, toast]
   );
 
+  const items = useMemo<RailItem[]>(() => {
+    const installed = state?.themes ?? [];
+    const entries = catalog?.entries ?? [];
+    const byId = new Map(installed.map((theme) => [theme.id, theme]));
+    const listed = new Set(entries.map((entry) => entry.id));
+    const merged: RailItem[] = entries.map((entry) => ({
+      kind: 'catalog',
+      entry,
+      installed: byId.get(entry.id) ?? null,
+    }));
+    for (const theme of installed) {
+      if (!listed.has(theme.id)) merged.push({ kind: 'local', theme });
+    }
+    return merged;
+  }, [state, catalog]);
+
   const activeTheme = state?.themes.find((t) => t.id === state.active) ?? null;
-  const selectedTheme =
-    state?.themes.find((t) => t.id === selectedId) ?? activeTheme ?? null;
+  const selectedItem =
+    items.find((item) => itemId(item) === selectedId) ?? items[0] ?? null;
+  const selectedTheme = itemTheme(selectedItem);
+  const selectedInstalled = selectedItem ? itemInstalled(selectedItem) : false;
   const count = state?.themes.length ?? 0;
   const themingOn = (state?.active ?? '') !== '';
+  const busyAll = busy || busyId !== null;
 
   // Track the rail scroll bounds so the arrow buttons disable at each end.
   const [railEnds, setRailEnds] = useState({ start: true, end: true });
@@ -151,7 +262,7 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
       observer.disconnect();
       window.removeEventListener('resize', update);
     };
-  }, [count]);
+  }, [items.length]);
 
   const conditionGroups = useMemo(() => {
     if (!selectedTheme) return [] as { label: string; items: ThemeCondition[] }[];
@@ -177,15 +288,19 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
       });
       return;
     }
-    const target = selectedId ?? state.themes[0]?.id;
-    if (!target) {
-      toast.info(t('themes.noInstalled'));
+    if (!selectedItem || !itemInstalled(selectedItem)) {
+      toast.info(
+        items.some((item) => itemInstalled(item))
+          ? t('themes.selectInstalled')
+          : t('themes.noInstalled')
+      );
       return;
     }
-    await run(() => invoke<PanelResult>('theme_activate', { id: target }), {
-      hint: true,
-    });
-  }, [busy, run, selectedId, state, themingOn, toast]);
+    await run(
+      () => invoke<PanelResult>('theme_activate', { id: itemId(selectedItem) }),
+      { hint: true }
+    );
+  }, [busy, items, run, selectedItem, state, themingOn, t, toast]);
 
   const handleActivate = useCallback(async () => {
     if (!selectedTheme) return;
@@ -194,6 +309,37 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
       { hint: true }
     );
   }, [run, selectedTheme]);
+
+  const handleInstall = useCallback(
+    async (id: string) => {
+      if (busy || busyId) return;
+      setBusyId(id);
+      try {
+        const ok = await run(() => invoke<PanelResult>('theme_install', { id }));
+        if (ok) setSelectedId(id);
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [busy, busyId, run]
+  );
+
+  const handleUninstall = useCallback(async () => {
+    const target = uninstallTarget;
+    if (!target || busyId) return;
+    setBusyId(target.id);
+    try {
+      const ok = await run(() =>
+        invoke<PanelResult>('theme_uninstall', { id: target.id })
+      );
+      if (ok) {
+        setUninstallTarget(null);
+        if (selectedId === target.id) setSelectedId(null);
+      }
+    } finally {
+      setBusyId(null);
+    }
+  }, [busyId, run, selectedId, uninstallTarget]);
 
   const handleSelectCondition = useCallback(
     (condition: ThemeCondition, value: string) => {
@@ -289,23 +435,54 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
         </span>
 
         <div className="panel-themes-head-actions">
-          <button
-            type="button"
-            className="btn btn-primary btn-sm panel-themes-apply"
-            onClick={() => {
-              void handleActivate();
-            }}
-            disabled={
-              busy ||
-              loading ||
-              !selectedTheme ||
-              selectedTheme.id === state?.active
-            }
-          >
-            {selectedTheme && selectedTheme.id === state?.active
-              ? t('themes.activeBtn')
-              : t('themes.applyBtn')}
-          </button>
+          {selectedItem && !selectedInstalled ? (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm panel-themes-apply"
+              onClick={() => {
+                void handleInstall(itemId(selectedItem));
+              }}
+              disabled={loading || busyAll}
+            >
+              {busyId && itemId(selectedItem) === busyId
+                ? t('themes.installing')
+                : t('themes.installBtn')}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm panel-themes-apply"
+              onClick={() => {
+                void handleActivate();
+              }}
+              disabled={
+                busyAll ||
+                loading ||
+                !selectedTheme ||
+                selectedTheme.id === state?.active
+              }
+            >
+              {selectedTheme && selectedTheme.id === state?.active
+                ? t('themes.activeBtn')
+                : t('themes.applyBtn')}
+            </button>
+          )}
+
+          {selectedItem && selectedInstalled && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm panel-themes-uninstall"
+              onClick={() =>
+                setUninstallTarget({
+                  id: itemId(selectedItem),
+                  name: itemName(selectedItem),
+                })
+              }
+              disabled={loading || busyAll}
+            >
+              {t('themes.uninstallBtn')}
+            </button>
+          )}
 
           <button
             type="button"
@@ -323,9 +500,9 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
             type="button"
             className="panel-themes-icon-btn"
             onClick={() => {
-              void refresh();
+              void refresh(true);
             }}
-            disabled={loading || busy}
+            disabled={loading || busyAll}
             aria-label={t('aria.refreshThemes')}
             title={t('ui.refresh')}
           >
@@ -338,8 +515,8 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
             role="switch"
             aria-checked={themingOn}
             aria-label={themingOn ? t('aria.disableTheming') : t('aria.enableTheming')}
-            aria-busy={busy}
-            disabled={busy || loading}
+            aria-busy={busyAll}
+            disabled={busyAll || loading}
             onClick={() => {
               void handleMasterToggle();
             }}
@@ -357,11 +534,8 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
 
       {loading ? (
         <div className="panel-themes-empty">{t('themes.loadingMsg')}</div>
-      ) : count === 0 ? (
-        <div className="panel-themes-empty">
-          {t('themes.emptyBefore')}{' '}
-          <code>LumaForge/themes</code>{t('themes.emptyAfter')}
-        </div>
+      ) : items.length === 0 && catalog?.source !== 'empty' ? (
+        <div className="panel-themes-empty">{t('themes.noInstalled')}</div>
       ) : (
         <>
           <div className="panel-themes-rail-wrap">
@@ -376,34 +550,80 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
             </button>
 
             <div className="panel-themes-rail" ref={railRef}>
-              {state?.themes.map((theme) => {
-                const isActive = theme.id === state.active;
-                const isSelected = theme.id === selectedTheme?.id;
-                const broken = imageErrors[theme.id];
-                return (
+              {catalog?.source === 'empty' && (
+                <div className="panel-theme-card panel-theme-card--error">
+                  <TriangleAlert size={18} aria-hidden="true" />
+                  <span className="panel-theme-card-error-text">
+                    {t('themes.catalogError')}
+                  </span>
                   <button
                     type="button"
-                    key={theme.id}
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => {
+                      void handleRetry();
+                    }}
+                    disabled={retrying}
+                  >
+                    {retrying ? t('themes.retrying') : t('themes.retry')}
+                  </button>
+                </div>
+              )}
+
+              {items.map((item) => {
+                const id = itemId(item);
+                const isActive = (state?.active ?? '') === id;
+                const isSelected = selectedItem
+                  ? itemId(selectedItem) === id
+                  : false;
+                const installed = itemInstalled(item);
+                const broken = imageErrors[id];
+                const preview =
+                  item.kind === 'local'
+                    ? item.theme.previewPath ?? null
+                    : (item.installed?.previewPath ??
+                      item.entry.previewPath ??
+                      previewPaths[item.entry.id] ??
+                      null);
+                const meta =
+                  item.kind === 'local'
+                    ? item.theme.author ||
+                      (item.theme.version ? `v${item.theme.version}` : '') ||
+                      '—'
+                    : item.entry.version
+                      ? `v${item.entry.version}`
+                      : `${item.entry.owner}/${item.entry.repo}`;
+                return (
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    key={id}
                     className={[
                       'panel-theme-card',
                       isSelected ? 'panel-theme-card--selected' : '',
                       isActive ? 'panel-theme-card--active' : '',
+                      !installed ? 'panel-theme-card--not-installed' : '',
                     ]
                       .filter(Boolean)
                       .join(' ')}
                     aria-pressed={isSelected}
-                    onClick={() => setSelectedId(theme.id)}
+                    onClick={() => setSelectedId(id)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        setSelectedId(id);
+                      }
+                    }}
                   >
                     <span className="panel-theme-card-thumb">
-                      {theme.previewPath && !broken ? (
+                      {preview && !broken ? (
                         <img
-                          src={convertFileSrc(theme.previewPath)}
+                          src={convertFileSrc(preview)}
                           alt=""
                           loading="lazy"
                           onError={() =>
                             setImageErrors((prev) => ({
                               ...prev,
-                              [theme.id]: true,
+                              [id]: true,
                             }))
                           }
                         />
@@ -415,20 +635,37 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
                           <Palette size={18} />
                         </span>
                       )}
+
+                      {!installed && (
+                        <span className="panel-theme-card-install">
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void handleInstall(id);
+                            }}
+                            disabled={loading || busyAll}
+                          >
+                            {busyId === id
+                              ? t('themes.installing')
+                              : t('themes.installBtn')}
+                          </button>
+                        </span>
+                      )}
+
                       {isActive && (
-                        <span className="panel-theme-card-badge">{t('themes.activeBadge')}</span>
+                        <span className="panel-theme-card-badge">
+                          {t('themes.activeBadge')}
+                        </span>
                       )}
                     </span>
 
                     <span className="panel-theme-card-name">
-                      {theme.name}
+                      {itemName(item)}
                     </span>
-                    <span className="panel-theme-card-meta">
-                      {theme.author ||
-                        (theme.version ? `v${theme.version}` : '') ||
-                        '—'}
-                    </span>
-                  </button>
+                    <span className="panel-theme-card-meta">{meta}</span>
+                  </div>
                 );
               })}
             </div>
@@ -639,6 +876,23 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
           </aside>
         </div>
       )}
+
+      <ConfirmModal
+        open={uninstallTarget !== null}
+        title={t('uninstall.title', [uninstallTarget?.name ?? ''])}
+        description={t('themes.uninstallDesc')}
+        warning={t('themes.uninstallWarning')}
+        confirmLabel={t('uninstall.confirm')}
+        cancelLabel={t('uninstall.cancel')}
+        busyLabel={t('uninstall.busy')}
+        tone="danger"
+        busy={busyId !== null}
+        autoFocus="cancel"
+        onCancel={() => setUninstallTarget(null)}
+        onConfirm={() => {
+          void handleUninstall();
+        }}
+      />
     </>
   );
 }

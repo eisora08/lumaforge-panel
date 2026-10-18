@@ -159,8 +159,17 @@ const EN: Record<string, string> = {
   'themes.cdpNote':
     'CDP injection is off — enable it so theme changes reach Steam live.',
   'themes.loadingMsg': 'Loading themes…',
-  'themes.emptyBefore': 'No Steam themes found. Install themes into',
-  'themes.emptyAfter': '.',
+  'themes.installBtn': 'INSTALL',
+  'themes.installing': 'Installing…',
+  'themes.uninstallBtn': 'UNINSTALL',
+  'themes.uninstallDesc':
+    'Removes this theme’s folder from LumaForge/themes. You can install it again later.',
+  'themes.uninstallWarning':
+    'If this theme is active, theming turns off. It stays available in the catalog.',
+  'themes.catalogError': 'Couldn’t reach the SteamBrew theme catalog.',
+  'themes.retry': 'RETRY',
+  'themes.retrying': 'RETRYING…',
+  'themes.selectInstalled': 'Select an installed theme first.',
   'themes.conditionsLabel': 'Conditions',
   'themes.activeBadge': 'Active',
 
@@ -327,8 +336,17 @@ const ES: Record<string, string> = {
   'themes.cdpNote':
     'La inyección CDP está desactivada: actívala para que los cambios de tema lleguen a Steam en vivo.',
   'themes.loadingMsg': 'Cargando temas…',
-  'themes.emptyBefore': 'No se encontraron temas de Steam. Instala temas en',
-  'themes.emptyAfter': '.',
+  'themes.installBtn': 'INSTALAR',
+  'themes.installing': 'Instalando…',
+  'themes.uninstallBtn': 'DESINSTALAR',
+  'themes.uninstallDesc':
+    'Elimina la carpeta de este tema de LumaForge/themes. Puedes instalarlo de nuevo después.',
+  'themes.uninstallWarning':
+    'Si el tema está activo, los temas se apagan. Sigue disponible en el catálogo.',
+  'themes.catalogError': 'No se pudo contactar el catálogo de temas de SteamBrew.',
+  'themes.retry': 'REINTENTAR',
+  'themes.retrying': 'REINTENTANDO…',
+  'themes.selectInstalled': 'Selecciona primero un tema instalado.',
   'themes.conditionsLabel': 'Condiciones',
   'themes.activeBadge': 'Activo',
 

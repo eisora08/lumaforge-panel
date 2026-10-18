@@ -41,8 +41,8 @@ pub struct WindowGeometry {
 impl Default for WindowGeometry {
     fn default() -> Self {
         Self {
-            width: 900.0,
-            height: 810.0,
+            width: 860.0,
+            height: 755.0,
             x: 0,
             y: 0,
         }
@@ -56,7 +56,7 @@ pub struct PanelSettings {
     pub appearance: AppearanceSettings,
     /// UI language: `"en"`, `"es"` or `""` (auto-detect on first run).
     pub language: String,
-    /// Last window geometry; `None` on first run → default 900x810 centered.
+    /// Last window geometry; `None` on first run → default 860x755 centered.
     pub window: Option<WindowGeometry>,
 }
 
@@ -308,21 +308,21 @@ mod tests {
 
     #[test]
     fn clamp_keeps_default_on_large_screen() {
-        let (w, h) = clamp_size(900.0, 810.0, 1920, 1032, 1.0, 720.0, 520.0);
-        assert_eq!((w, h), (900.0, 810.0));
+        let (w, h) = clamp_size(860.0, 755.0, 1920, 1032, 1.0, 720.0, 520.0);
+        assert_eq!((w, h), (860.0, 755.0));
     }
 
     #[test]
     fn clamp_shrinks_height_to_work_area() {
-        let (w, h) = clamp_size(900.0, 810.0, 1366, 720, 1.0, 720.0, 520.0);
-        assert_eq!(w, 900.0);
+        let (w, h) = clamp_size(860.0, 755.0, 1366, 720, 1.0, 720.0, 520.0);
+        assert_eq!(w, 860.0);
         assert_eq!(h, 688.0);
     }
 
     #[test]
     fn clamp_applies_physical_margin_on_hidpi() {
-        let (w, h) = clamp_size(900.0, 810.0, 2560, 1440, 2.0, 720.0, 520.0);
-        assert_eq!(w, 900.0);
+        let (w, h) = clamp_size(860.0, 755.0, 2560, 1440, 2.0, 720.0, 520.0);
+        assert_eq!(w, 860.0);
         assert_eq!(h, 688.0);
     }
 
@@ -334,7 +334,7 @@ mod tests {
 
     #[test]
     fn clamp_accepts_sub_min_when_work_area_is_smaller() {
-        let (w, h) = clamp_size(900.0, 810.0, 700, 500, 1.0, 720.0, 520.0);
+        let (w, h) = clamp_size(860.0, 755.0, 700, 500, 1.0, 720.0, 520.0);
         assert_eq!(w, 668.0);
         assert_eq!(h, 468.0);
     }

@@ -213,7 +213,7 @@ pub const TOOL_DEFS: &[ToolDef] = &[
         id: "cloud_redirect",
         name: "CloudRedirect",
         description: "Redirects Steam Cloud saves to Google Drive, OneDrive, S3, R2 or local.",
-        github_owner: "Selectively11",
+        github_owner: "eisora08",
         github_repo: "CloudRedirect",
         preferred_asset: CLOUD_REDIRECT_ASSET,
         preferred_asset_contains: None,

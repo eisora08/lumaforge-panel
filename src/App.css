@@ -4328,6 +4328,10 @@ html[data-window-maximized="true"] .app-shell {
    Responsive layout
    ========================================================================== */
 
+/* Window-driven compact scaling lives in the "Compact window bands" section
+   at the end of this file (per-element media queries; shell stays at 100%/100vh
+   and .view-content scrolls vertically). */
+
 @media (max-width: 820px) {
   .modern-dashboard {
     padding: 18px;
@@ -8589,8 +8593,7 @@ html[data-window-maximized="true"] .app-shell {
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
-  flex: 1;
-  min-height: 0;
+  flex: none;
 }
 
 .panel-hero {
@@ -8862,19 +8865,9 @@ html[data-window-maximized="true"] .app-shell {
   flex-shrink: 0;
 }
 
-@media (max-width: 760px) {
-  .panel-hero {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .panel-power-area {
-    flex-direction: row;
-    align-self: stretch;
-    justify-content: space-between;
-    align-items: center;
-  }
-}
+/* Hero stays in row layout at every reachable window width (min 720px):
+   copy on the left, power button on the right — the previous <=760px stack
+   pushed the big ENABLED button below the text and wasted vertical space. */
 
 
 /* ── Themes card ─────────────────────────────────────────────────────── */
@@ -9099,9 +9092,58 @@ html[data-window-maximized="true"] .app-shell {
   margin-top: -4px;
 }
 
+.panel-theme-card--not-installed .panel-theme-card-name {
+  color: var(--text-secondary);
+}
+
+/* Centered INSTALL overlay on not-installed catalog cards ------------- */
+
+.panel-theme-card-install {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 6, 23, 0.5);
+}
+
+.panel-theme-card-install .btn {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+/* Catalog-unreachable card shown inside the rail ---------------------- */
+
+.panel-theme-card--error {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--sp-2);
+  cursor: default;
+  border-style: dashed;
+}
+
+.panel-theme-card--error:hover {
+  background: var(--surface-input);
+  border-color: var(--border-subtle);
+}
+
+.panel-theme-card--error svg {
+  color: var(--warning, #f59e0b);
+}
+
+.panel-theme-card-error-text {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
 /* Detail strip (removed — APPLY/gear live in the card header) ------------ */
 
 .panel-themes-apply {
+  flex-shrink: 0;
+}
+
+.panel-themes-uninstall {
   flex-shrink: 0;
 }
 
@@ -9327,4 +9369,79 @@ html[data-window-maximized="true"] .app-shell {
   font-size: var(--text-xs);
   color: var(--text-dim, var(--text-muted));
   line-height: 1.4;
+}
+
+/* ==========================================================================
+   Compact window bands (720-860px range)
+   ==========================================================================
+   The window defaults to 860x755 and can shrink to 720x520. These bands step
+   the dashboard widgets down in size as the window narrows so header controls
+   and themes actions stay on screen; vertical overflow scrolls inside
+   .view-content. Placed at the end of the file so they win over the base
+   rules above (same specificity, later position). */
+
+@media (max-width: 830px) {
+  .panel-theme-card {
+    width: 152px;
+  }
+
+  .panel-power {
+    width: 88px;
+    height: 88px;
+  }
+
+  .panel-hero-title {
+    font-size: 19px;
+  }
+}
+
+@media (max-width: 780px) {
+  .panel-themes {
+    padding: var(--sp-3);
+  }
+
+  .panel-themes-head {
+    gap: var(--sp-2);
+  }
+
+  .panel-themes-head-actions {
+    gap: var(--sp-2);
+  }
+
+  .panel-theme-card {
+    width: 140px;
+  }
+
+  .panel-hero {
+    gap: var(--sp-4);
+    padding: var(--sp-3);
+  }
+
+  .panel-component-row {
+    min-height: 46px;
+    padding: var(--sp-2) var(--sp-3);
+  }
+}
+
+@media (max-width: 735px) {
+  .panel-themes-head {
+    flex-wrap: wrap;
+  }
+
+  .panel-themes-count {
+    display: none;
+  }
+
+  .panel-power {
+    width: 76px;
+    height: 76px;
+  }
+
+  .panel-hero-title {
+    font-size: 18px;
+  }
+
+  .panel-power-desc {
+    max-width: 110px;
+  }
 }

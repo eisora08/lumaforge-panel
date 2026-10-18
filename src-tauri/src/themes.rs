@@ -1,8 +1,11 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use crate::github;
 use crate::panel::PanelResult;
 use crate::paths;
 
@@ -347,10 +350,15 @@ pub fn get_state() -> ThemesState {
     ThemesState { active, themes }
 }
 
-fn validate_theme(id: &str) -> Result<(), String> {
+fn validate_id(id: &str) -> Result<(), String> {
     if id.is_empty() || id.contains('/') || id.contains('\\') || id.contains("..") {
         return Err(crate::i18n::t("theme.invalid_name", &[]));
     }
+    Ok(())
+}
+
+fn validate_theme(id: &str) -> Result<(), String> {
+    validate_id(id)?;
     if !themes_dir().join(id).join("skin.json").is_file() {
         return Err(crate::i18n::t("theme.not_installed", &[id]));
     }
@@ -515,6 +523,503 @@ fn ipc_sync() -> Result<String, String> {
 }
 
 // ---------------------------------------------------------------------------
+// Catalog — SteamBrew API (steambrew.app/api/v2) + on-disk cache
+// ---------------------------------------------------------------------------
+
+const CATALOG_API: &str = "https://steambrew.app/api/v2";
+const CATALOG_TTL_SECS: u64 = 30 * 60;
+const CATALOG_UA: &str = concat!(
+    env!("CARGO_PKG_NAME"),
+    "/",
+    env!("CARGO_PKG_VERSION"),
+    " (+https://github.com/eisora08/lumaforge-panel)"
+);
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CatalogTheme {
+    pub id: String,
+    pub name: String,
+    pub owner: String,
+    pub repo: String,
+    pub description: String,
+    pub version: String,
+    pub tags: Vec<String>,
+    pub download: String,
+    pub preview: Option<String>,
+    #[serde(default)]
+    pub preview_path: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CatalogResult {
+    pub entries: Vec<CatalogTheme>,
+    /// "live" = fetched from the API, "cache" = disk fallback, "empty" = unavailable.
+    pub source: &'static str,
+}
+
+struct CatalogMemory {
+    fetched_at: Instant,
+    entries: Vec<CatalogTheme>,
+}
+
+fn catalog_memory() -> &'static Mutex<Option<CatalogMemory>> {
+    static CELL: OnceLock<Mutex<Option<CatalogMemory>>> = OnceLock::new();
+    CELL.get_or_init(|| Mutex::new(None))
+}
+
+fn catalog_cache_path() -> PathBuf {
+    paths::app_data_dir().join("theme-catalog.json")
+}
+
+fn previews_dir() -> PathBuf {
+    paths::app_data_dir().join("theme-previews")
+}
+
+/// Directory-safe id: lowercased `[a-z0-9-]`, dashes collapsed, dashes trimmed.
+fn slug(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for ch in value.chars() {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch.to_ascii_lowercase());
+        } else if !out.ends_with('-') {
+            out.push('-');
+        }
+    }
+    let trimmed = out.trim_matches('-').to_string();
+    if trimmed.is_empty() {
+        "theme".to_string()
+    } else {
+        trimmed
+    }
+}
+
+fn valid_repo_ref(value: &str) -> bool {
+    !value.is_empty()
+        && value
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
+}
+
+fn row_github(row: &Value) -> Option<(&str, &str)> {
+    let owner = row["data"]["github"]["owner"].as_str()?;
+    let repo = row["data"]["github"]["repo"].as_str()?;
+    Some((owner, repo))
+}
+
+fn parse_catalog(raw: &str) -> Result<Vec<CatalogTheme>, String> {
+    let rows: Vec<Value> = serde_json::from_str(raw).map_err(|e| format!("catalog parse: {e}"))?;
+
+    // First pass: a repo slug shared by several owners needs an owner prefix.
+    let mut slug_counts: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+    for row in &rows {
+        if let Some((owner, repo)) = row_github(row) {
+            if valid_repo_ref(owner) && valid_repo_ref(repo) {
+                *slug_counts.entry(slug(repo)).or_insert(0) += 1;
+            }
+        }
+    }
+
+    let mut entries: Vec<CatalogTheme> = Vec::new();
+    for row in &rows {
+        let Some((owner, repo)) = row_github(row) else {
+            continue;
+        };
+        if !valid_repo_ref(owner) || !valid_repo_ref(repo) {
+            continue;
+        }
+
+        let download = row["download"].as_str().unwrap_or_default().to_string();
+        let archive_prefix = format!("https://github.com/{owner}/{repo}/archive/");
+        if !download.starts_with(&archive_prefix) {
+            continue;
+        }
+
+        let preview = ["splash_image", "header_image"]
+            .iter()
+            .filter_map(|key| row.get(*key).and_then(|value| value.as_str()))
+            .find(|url| url.starts_with("https://"))
+            .map(|url| url.to_string());
+
+        let base = slug(repo);
+        let id = if slug_counts.get(&base).copied().unwrap_or(0) > 1 {
+            slug(&format!("{owner}-{repo}"))
+        } else {
+            base
+        };
+
+        let skin = &row["skin_data"];
+        let name = row["name"]
+            .as_str()
+            .filter(|value| !value.is_empty())
+            .or_else(|| skin["name"].as_str())
+            .filter(|value| !value.is_empty())
+            .unwrap_or(repo)
+            .to_string();
+
+        entries.push(CatalogTheme {
+            id,
+            name,
+            owner: owner.to_string(),
+            repo: repo.to_string(),
+            description: row["description"].as_str().unwrap_or_default().to_string(),
+            version: row["version"].as_str().unwrap_or_default().to_string(),
+            tags: row["tags"]
+                .as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|tag| tag.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default(),
+            download,
+            preview,
+            preview_path: None,
+        });
+    }
+
+    // Final uniqueness pass (owner-prefixed slugs can still collide).
+    let mut seen = std::collections::HashSet::new();
+    for entry in &mut entries {
+        let mut candidate = entry.id.clone();
+        let mut n = 2;
+        while !seen.insert(candidate.clone()) {
+            candidate = format!("{}-{n}", entry.id);
+            n += 1;
+        }
+        entry.id = candidate;
+    }
+    Ok(entries)
+}
+
+fn fnv1a_hex(value: &str) -> String {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in value.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    format!("{hash:016x}")
+}
+
+fn preview_filename(url: &str) -> Option<String> {
+    let parsed = reqwest::Url::parse(url).ok()?;
+    if parsed.scheme() != "https" {
+        return None;
+    }
+    let ext = parsed.path().rsplit('.').next()?.to_ascii_lowercase();
+    if !matches!(ext.as_str(), "webp" | "png" | "jpg" | "jpeg" | "gif") {
+        return None;
+    }
+    Some(format!("{}.{ext}", fnv1a_hex(url)))
+}
+
+fn build_result(mut entries: Vec<CatalogTheme>, source: &'static str) -> CatalogResult {
+    for entry in &mut entries {
+        entry.preview_path = entry
+            .preview
+            .as_deref()
+            .and_then(preview_filename)
+            .and_then(|name| {
+                let path = previews_dir().join(&name);
+                path.is_file()
+                    .then(|| path.to_string_lossy().to_string())
+            });
+    }
+    CatalogResult { entries, source }
+}
+
+/// Drop cached previews that no catalog entry references anymore.
+fn prune_previews(entries: &[CatalogTheme]) {
+    let keep: std::collections::HashSet<String> = entries
+        .iter()
+        .filter_map(|entry| entry.preview.as_deref())
+        .filter_map(preview_filename)
+        .collect();
+    if let Ok(dir_entries) = fs::read_dir(previews_dir()) {
+        for dir_entry in dir_entries.flatten() {
+            let name = dir_entry.file_name().to_string_lossy().to_string();
+            if name.ends_with(".part") || keep.contains(&name) {
+                continue;
+            }
+            let _ = fs::remove_file(dir_entry.path());
+        }
+    }
+}
+
+fn catalog_client() -> Result<reqwest::blocking::Client, String> {
+    reqwest::blocking::Client::builder()
+        .user_agent(CATALOG_UA)
+        .connect_timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(|e| e.to_string())
+}
+
+fn fetch_catalog_live() -> Result<Vec<CatalogTheme>, String> {
+    let client = catalog_client()?;
+    let response = client
+        .get(CATALOG_API)
+        .send()
+        .map_err(|e| e.to_string())?;
+    if !response.status().is_success() {
+        return Err(format!("HTTP {}", response.status()));
+    }
+    let body = response.text().map_err(|e| e.to_string())?;
+    parse_catalog(&body)
+}
+
+/// Memory (TTL) -> live API (+ disk snapshot) -> disk -> empty.
+fn load_catalog(force: bool) -> CatalogResult {
+    if !force {
+        if let Ok(cell) = catalog_memory().lock() {
+            if let Some(mem) = cell.as_ref() {
+                if mem.fetched_at.elapsed().as_secs() < CATALOG_TTL_SECS {
+                    return build_result(mem.entries.clone(), "live");
+                }
+            }
+        }
+    }
+
+    match fetch_catalog_live() {
+        Ok(entries) => {
+            if let Ok(mut cell) = catalog_memory().lock() {
+                *cell = Some(CatalogMemory {
+                    fetched_at: Instant::now(),
+                    entries: entries.clone(),
+                });
+            }
+            if let Ok(json) = serde_json::to_string(&entries) {
+                let _ = paths::atomic_write(&catalog_cache_path(), &json);
+            }
+            prune_previews(&entries);
+            build_result(entries, "live")
+        }
+        Err(_) => {
+            // API unreachable: serve the last good copy from disk. Memory stays
+            // empty so the next call retries the API instead of going stale.
+            match fs::read_to_string(catalog_cache_path())
+                .ok()
+                .and_then(|raw| serde_json::from_str::<Vec<CatalogTheme>>(&raw).ok())
+            {
+                Some(entries) => build_result(entries, "cache"),
+                None => CatalogResult {
+                    entries: Vec::new(),
+                    source: "empty",
+                },
+            }
+        }
+    }
+}
+
+pub fn fetch_preview(url: &str) -> Result<String, String> {
+    let parsed = reqwest::Url::parse(url)
+        .map_err(|e| crate::i18n::t("err.theme_preview_url", &[&e.to_string()]))?;
+    let host = parsed.host_str().unwrap_or_default().to_string();
+    if parsed.scheme() != "https"
+        || !matches!(
+            host.as_str(),
+            "raw.githubusercontent.com" | "i.imgur.com"
+        )
+    {
+        return Err(crate::i18n::t("err.theme_preview_host", &[&host]));
+    }
+    let filename =
+        preview_filename(url).ok_or_else(|| crate::i18n::t("err.theme_preview_type", &[url]))?;
+    let path = previews_dir().join(&filename);
+    if path.is_file() {
+        return Ok(path.to_string_lossy().to_string());
+    }
+
+    let client = reqwest::blocking::Client::builder()
+        .user_agent(CATALOG_UA)
+        .connect_timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(60))
+        .build()
+        .map_err(|e| crate::i18n::t("err.theme_preview_fetch", &[&e.to_string()]))?;
+    let response = client
+        .get(url)
+        .send()
+        .map_err(|e| crate::i18n::t("err.theme_preview_fetch", &[&e.to_string()]))?;
+    if !response.status().is_success() {
+        let message = format!("HTTP {}", response.status());
+        return Err(crate::i18n::t("err.theme_preview_fetch", &[&message]));
+    }
+    let bytes = response
+        .bytes()
+        .map_err(|e| crate::i18n::t("err.theme_preview_fetch", &[&e.to_string()]))?;
+    if bytes.is_empty() {
+        let message = "empty body".to_string();
+        return Err(crate::i18n::t("err.theme_preview_fetch", &[&message]));
+    }
+
+    let _ = fs::create_dir_all(previews_dir());
+    let part = previews_dir().join(format!("{filename}.part"));
+    fs::write(&part, &bytes)
+        .map_err(|e| crate::i18n::t("err.theme_preview_fetch", &[&e.to_string()]))?;
+    if let Err(e) = fs::rename(&part, &path) {
+        let _ = fs::remove_file(&part);
+        if !path.is_file() {
+            return Err(crate::i18n::t("err.theme_preview_fetch", &[&e.to_string()]));
+        }
+    }
+    Ok(path.to_string_lossy().to_string())
+}
+
+fn find_theme_root(extract_dir: &Path) -> Option<PathBuf> {
+    if extract_dir.join("skin.json").is_file() {
+        return Some(extract_dir.to_path_buf());
+    }
+    let root =
+        github::flatten_extracted_dir(extract_dir).unwrap_or_else(|| extract_dir.to_path_buf());
+    if root.join("skin.json").is_file() {
+        return Some(root);
+    }
+    find_skin_dir(&root, 0)
+}
+
+fn find_skin_dir(dir: &Path, depth: u8) -> Option<PathBuf> {
+    if depth > 4 {
+        return None;
+    }
+    let mut children: Vec<PathBuf> = fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.is_dir())
+        .collect();
+    children.sort();
+    for child in children {
+        if child.join("skin.json").is_file() {
+            return Some(child);
+        }
+        if let Some(found) = find_skin_dir(&child, depth + 1) {
+            return Some(found);
+        }
+    }
+    None
+}
+
+fn post_download_count(owner: &str, repo: &str) -> Result<(), String> {
+    let client = reqwest::blocking::Client::builder()
+        .user_agent(CATALOG_UA)
+        .connect_timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(15))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let payload = serde_json::json!({ "owner": owner, "repo": repo });
+    let response = client
+        .post(format!("{CATALOG_API}/download"))
+        .json(&payload)
+        .send()
+        .map_err(|e| e.to_string())?;
+    if !response.status().is_success() {
+        return Err(format!("HTTP {}", response.status()));
+    }
+    Ok(())
+}
+
+pub fn install(id: &str) -> Result<PanelResult, String> {
+    validate_id(id)?;
+    let catalog = load_catalog(false);
+    let entry = catalog
+        .entries
+        .iter()
+        .find(|entry| entry.id == id)
+        .ok_or_else(|| crate::i18n::t("err.theme_unknown", &[id]))?
+        .clone();
+
+    if themes_dir().join(id).join("skin.json").is_file() {
+        return Ok(PanelResult {
+            ok: true,
+            message: crate::i18n::t("theme.already_installed", &[&entry.name]),
+            restart_required: false,
+        });
+    }
+
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    let temp_dir = paths::temp_dir().join(format!("panel_theme_{}_{stamp}", entry.id));
+    fs::create_dir_all(&temp_dir).map_err(|e| e.to_string())?;
+
+    let outcome = (|| -> Result<PanelResult, String> {
+        let archive = temp_dir.join("theme.zip");
+        github::download_file(&entry.download, &archive)
+            .map_err(|e| crate::i18n::t("err.theme_download", &[&entry.name, &e.to_string()]))?;
+
+        let extract_dir = temp_dir.join("extracted");
+        github::extract_archive(&archive, "zip", &extract_dir)
+            .map_err(|e| crate::i18n::t("err.theme_extract", &[&e.to_string()]))?;
+
+        let source = find_theme_root(&extract_dir)
+            .ok_or_else(|| crate::i18n::t("err.theme_no_skin", &[]))?;
+
+        let target = themes_dir().join(id);
+        github::copy_dir_recursive(&source, &target)?;
+
+        // Best effort: credit the download on SteamBrew.
+        let _ = post_download_count(&entry.owner, &entry.repo);
+
+        Ok(PanelResult {
+            ok: true,
+            message: crate::i18n::t("theme.installed", &[&entry.name]),
+            restart_required: false,
+        })
+    })();
+
+    let _ = fs::remove_dir_all(&temp_dir);
+    outcome
+}
+
+/// Drop `themes.conditions.{id}` from active.json, preserving everything else.
+fn remove_theme_conditions(id: &str) -> Result<bool, String> {
+    let doc = read_active_doc();
+    let mut root = match doc {
+        Value::Object(map) => map,
+        _ => Map::new(),
+    };
+    let removed = root
+        .get_mut("themes")
+        .and_then(|themes| themes.get_mut("conditions"))
+        .and_then(|conditions| conditions.as_object_mut())
+        .map(|conditions| conditions.remove(id).is_some())
+        .unwrap_or(false);
+    if removed {
+        write_active_doc(&Value::Object(root))?;
+    }
+    Ok(removed)
+}
+
+pub fn uninstall(id: &str) -> Result<PanelResult, String> {
+    validate_id(id)?;
+    if !themes_dir().join(id).join("skin.json").is_file() {
+        return Err(crate::i18n::t("theme.not_installed", &[id]));
+    }
+
+    let was_active = active_name(&read_active_doc()) == id;
+    if was_active {
+        set_active_name("")?;
+    }
+    let conditions_removed = remove_theme_conditions(id)?;
+
+    github::remove_dir_recursive(&themes_dir().join(id))?;
+
+    let needs_sync = was_active || conditions_removed;
+    let suffix = if needs_sync && sync_proxy().is_err() {
+        sync_suffix()
+    } else {
+        String::new()
+    };
+    Ok(PanelResult {
+        ok: true,
+        message: crate::i18n::t("theme.uninstalled", &[id, &suffix]),
+        restart_required: false,
+    })
+}
+
+// ---------------------------------------------------------------------------
 // Tauri commands
 // ---------------------------------------------------------------------------
 
@@ -545,4 +1050,93 @@ pub fn theme_set_condition(
 #[tauri::command]
 pub fn theme_reset_condition(theme_id: String, key: String) -> Result<PanelResult, String> {
     reset_condition(&theme_id, &key)
+}
+
+#[tauri::command]
+pub fn themes_catalog(force: Option<bool>) -> CatalogResult {
+    load_catalog(force.unwrap_or(false))
+}
+
+#[tauri::command]
+pub fn theme_fetch_preview(url: String) -> Result<String, String> {
+    fetch_preview(&url)
+}
+
+#[tauri::command]
+pub fn theme_install(id: String) -> Result<PanelResult, String> {
+    install(&id)
+}
+
+#[tauri::command]
+pub fn theme_uninstall(id: String) -> Result<PanelResult, String> {
+    uninstall(&id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn slug_lowercases_and_collapses_dashes() {
+        assert_eq!(slug("My_Theme.Name"), "my-theme-name");
+        assert_eq!(slug("--x--"), "x");
+        assert_eq!(slug("??"), "theme");
+    }
+
+    #[test]
+    fn parse_catalog_filters_rows_and_derives_ids() {
+        let raw = r#"[
+            {
+                "name": "",
+                "version": "1.2.0",
+                "description": "desc",
+                "tags": ["dark"],
+                "splash_image": "https://raw.githubusercontent.com/o/r/main/preview.webp",
+                "download": "https://github.com/o/r/archive/refs/heads/main.zip",
+                "data": { "github": { "owner": "o", "repo": "r" } },
+                "skin_data": { "name": "Fallback Name" }
+            },
+            {
+                "name": "Bad",
+                "download": "https://evil.example/x.zip",
+                "data": { "github": { "owner": "o", "repo": "bad" } }
+            },
+            {
+                "name": "No repo",
+                "download": "https://github.com/o/x/archive/refs/heads/main.zip"
+            }
+        ]"#;
+        let entries = parse_catalog(raw).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].id, "r");
+        assert_eq!(entries[0].name, "Fallback Name");
+        assert_eq!(entries[0].owner, "o");
+        assert_eq!(entries[0].version, "1.2.0");
+        assert_eq!(entries[0].tags, vec!["dark".to_string()]);
+        assert_eq!(
+            entries[0].preview.as_deref(),
+            Some("https://raw.githubusercontent.com/o/r/main/preview.webp")
+        );
+    }
+
+    #[test]
+    fn parse_catalog_prefixes_duplicate_repo_slugs() {
+        let row = |owner: &str, repo: &str| {
+            format!(
+                r#"{{
+                    "download": "https://github.com/{owner}/{repo}/archive/refs/heads/main.zip",
+                    "data": {{ "github": {{ "owner": "{owner}", "repo": "{repo}" }} }}
+                }}"#
+            )
+        };
+        let raw = format!(
+            "[{},{},{}]",
+            row("alpha", "theme"),
+            row("beta", "theme"),
+            row("alpha", "other")
+        );
+        let entries = parse_catalog(&raw).unwrap();
+        let ids: Vec<&str> = entries.iter().map(|entry| entry.id.as_str()).collect();
+        assert_eq!(ids, vec!["alpha-theme", "beta-theme", "other"]);
+    }
 }

@@ -121,3 +121,27 @@ export interface ThemesState {
   active: string;
   themes: ThemeInfo[];
 }
+
+// SteamBrew catalog (remote themes available for install)
+// ---------------------------------------------------------------------------
+
+export interface CatalogTheme {
+  /** Directory-safe slug used as the install folder name. */
+  id: string;
+  name: string;
+  owner: string;
+  repo: string;
+  description: string;
+  version: string;
+  tags: string[];
+  download: string;
+  preview?: string | null;
+  /** Local path of an already-cached preview image, when present. */
+  previewPath?: string | null;
+}
+
+export interface ThemesCatalog {
+  entries: CatalogTheme[];
+  /** "live" = API fetch, "cache" = disk fallback, "empty" = API unreachable. */
+  source: 'live' | 'cache' | 'empty';
+}

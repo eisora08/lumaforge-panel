@@ -14,8 +14,8 @@
       {
         "label": "main",
         "title": "LumaForge Panel",
-        "width": 900,
-        "height": 810,
+        "width": 860,
+        "height": 755,
         "minWidth": 720,
         "minHeight": 520,
         "visible": false,
@@ -32,7 +32,9 @@
         "enable": true,
         "scope": [
           "$LOCALDATA/LumaForge/themes/**",
-          "$HOME/.local/share/LumaForge/themes/**"
+          "$LOCALDATA/LumaForge/theme-previews/**",
+          "$HOME/.local/share/LumaForge/themes/**",
+          "$HOME/.local/share/LumaForge/theme-previews/**"
         ]
       }
     }

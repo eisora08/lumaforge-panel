@@ -69,6 +69,10 @@ pub fn run() {
             themes::theme_deactivate,
             themes::theme_set_condition,
             themes::theme_reset_condition,
+            themes::themes_catalog,
+            themes::theme_fetch_preview,
+            themes::theme_install,
+            themes::theme_uninstall,
         ])
         .build(tauri::generate_context!())
         .expect("error while building lumaforge-panel");
@@ -108,8 +112,8 @@ fn restore_geometry(
 
     let work = monitor.work_area();
     let (width, height) = settings::clamp_size(
-        saved.map_or(900.0, |geometry| geometry.width),
-        saved.map_or(810.0, |geometry| geometry.height),
+        saved.map_or(860.0, |geometry| geometry.width),
+        saved.map_or(755.0, |geometry| geometry.height),
         work.size.width,
         work.size.height,
         monitor.scale_factor(),
