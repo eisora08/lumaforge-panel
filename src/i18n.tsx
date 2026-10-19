@@ -172,6 +172,13 @@ const EN: Record<string, string> = {
   'themes.selectInstalled': 'Select an installed theme first.',
   'themes.conditionsLabel': 'Conditions',
   'themes.activeBadge': 'Active',
+  'themes.filterAll': 'All',
+  'themes.filterInstalled': 'Installed',
+  'themes.filterUninstalled': 'Not installed',
+  'themes.sortName': 'Name',
+  'themes.sortNewest': 'Newest',
+  'themes.sortOldest': 'Oldest',
+  'themes.noMatches': 'No themes match the current filter.',
 
   // themes — settings panel
   'panel.activeTheme': 'Active theme',
@@ -349,6 +356,13 @@ const ES: Record<string, string> = {
   'themes.selectInstalled': 'Selecciona primero un tema instalado.',
   'themes.conditionsLabel': 'Condiciones',
   'themes.activeBadge': 'Activo',
+  'themes.filterAll': 'Todos',
+  'themes.filterInstalled': 'Instalados',
+  'themes.filterUninstalled': 'No instalados',
+  'themes.sortName': 'Nombre',
+  'themes.sortNewest': 'Recientes',
+  'themes.sortOldest': 'Antiguos',
+  'themes.noMatches': 'Ningún tema coincide con el filtro actual.',
 
   'panel.activeTheme': 'Tema activo',
   'panel.settings': 'Ajustes del tema',

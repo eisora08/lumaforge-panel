@@ -87,6 +87,10 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
     name: string;
   } | null>(null);
   const [retrying, setRetrying] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'installed' | 'uninstalled'>(
+    'all'
+  );
+  const [sort, setSort] = useState<'name' | 'newest' | 'oldest'>('name');
 
   const railRef = useRef<HTMLDivElement | null>(null);
   const sliderTimer = useRef<number | null>(null);
@@ -225,8 +229,30 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
     for (const theme of installed) {
       if (!listed.has(theme.id)) merged.push({ kind: 'local', theme });
     }
-    return merged;
-  }, [state, catalog]);
+
+    // Filter.
+    let result = merged;
+    if (filter === 'installed') {
+      result = result.filter((item) => itemInstalled(item));
+    } else if (filter === 'uninstalled') {
+      result = result.filter((item) => !itemInstalled(item));
+    }
+
+    // Sort.
+    if (sort === 'name') {
+      result = [...result].sort((a, b) =>
+        itemName(a).localeCompare(itemName(b), undefined, { sensitivity: 'base' })
+      );
+    } else if (sort === 'oldest') {
+      // Catalog is newest-first; reverse it. Local-only themes go first.
+      const catalogItems = result.filter((item) => item.kind === 'catalog');
+      const localItems = result.filter((item) => item.kind === 'local');
+      result = [...localItems, ...catalogItems.reverse()];
+    }
+    // 'newest' keeps the natural merge order (catalog order + locals last).
+
+    return result;
+  }, [state, catalog, filter, sort]);
 
   const activeTheme = state?.themes.find((t) => t.id === state.active) ?? null;
   const selectedItem =
@@ -434,6 +460,35 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
           {t('themes.count', [count])}
         </span>
 
+        <div className="panel-themes-filters">
+          <select
+            className="panel-themes-select"
+            value={filter}
+            onChange={(e) =>
+              setFilter(e.target.value as 'all' | 'installed' | 'uninstalled')
+            }
+            aria-label={t('themes.filterAll')}
+            disabled={loading}
+          >
+            <option value="all">{t('themes.filterAll')}</option>
+            <option value="installed">{t('themes.filterInstalled')}</option>
+            <option value="uninstalled">{t('themes.filterUninstalled')}</option>
+          </select>
+          <select
+            className="panel-themes-select"
+            value={sort}
+            onChange={(e) =>
+              setSort(e.target.value as 'name' | 'newest' | 'oldest')
+            }
+            aria-label={t('themes.sortName')}
+            disabled={loading}
+          >
+            <option value="name">{t('themes.sortName')}</option>
+            <option value="newest">{t('themes.sortNewest')}</option>
+            <option value="oldest">{t('themes.sortOldest')}</option>
+          </select>
+        </div>
+
         <div className="panel-themes-head-actions">
           {selectedItem && !selectedInstalled ? (
             <button
@@ -535,7 +590,9 @@ export function ThemesCard({ cdpState }: ThemesCardProps) {
       {loading ? (
         <div className="panel-themes-empty">{t('themes.loadingMsg')}</div>
       ) : items.length === 0 && catalog?.source !== 'empty' ? (
-        <div className="panel-themes-empty">{t('themes.noInstalled')}</div>
+        <div className="panel-themes-empty">
+          {filter !== 'all' ? t('themes.noMatches') : t('themes.noInstalled')}
+        </div>
       ) : (
         <>
           <div className="panel-themes-rail-wrap">
