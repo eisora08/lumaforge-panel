@@ -18,6 +18,9 @@ pub struct ToolStatus {
     pub latest_version: Option<String>,
     pub update_available: bool,
     pub release_available: bool,
+    /// `hash` | `marker` | `mtime` when the version was read from disk,
+    /// `null` when it came from the shared state file.
+    pub version_detected: Option<String>,
     pub deploy_path: Option<String>,
 }
 
@@ -81,7 +84,7 @@ fn build_status() -> PanelStatus {
         let payload_installed = tools::payload_installed(def);
 
         let entry = state_map.tools.get(def.id);
-        let installed_version = entry.map(|e| e.version.clone());
+        let state_version = entry.map(|e| e.version.clone());
 
         let (owner, repo, asset, contains) = (
             def.github_owner,
@@ -95,10 +98,29 @@ fn build_status() -> PanelStatus {
             Ok(info) => (Some(info.tag_name.clone()), true),
             Err(_) => (None, false),
         };
+        // Disk wins over state: a manual install/update is still the truth.
+        let detected = release
+            .as_ref()
+            .ok()
+            .and_then(|info| tools::detect_installed_version(def, info));
+
+        let (installed_version, version_detected) = match detected {
+            Some(found) => {
+                // Keep the shared state in sync so the proxy reports the same.
+                if state_version.as_deref() != Some(found.version.as_str()) {
+                    let _ = state::set_version(def.id, &found.version);
+                }
+                (Some(found.version), Some(found.source.as_str().to_string()))
+            }
+            None => (state_version, None),
+        };
 
         let update_available = match (&installed_version, &latest_version) {
             (Some(installed), Some(latest)) => {
-                installed != latest && installed != "detected"
+                installed != "detected"
+                    && !tools::versions_equal(installed, latest)
+                    // A local build ahead of the last release is up to date.
+                    && !tools::is_newer(installed, latest)
             }
             _ => false,
         };
@@ -127,6 +149,7 @@ fn build_status() -> PanelStatus {
             latest_version,
             update_available,
             release_available,
+            version_detected,
             deploy_path,
         });
     }

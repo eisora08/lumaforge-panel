@@ -343,6 +343,257 @@ pub fn payload_installed(def: &ToolDef) -> bool {
 }
 
 // ---------------------------------------------------------------------------
+// Installed-version detection (disk first, state last)
+// ---------------------------------------------------------------------------
+
+/// How the installed version was established — surfaced so the UI can mark a
+/// version as `detected` (read from disk) instead of installed by the app.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VersionSource {
+    /// Local SHA-256 matches the release asset's digest.
+    Hash,
+    /// The payload carries its own version marker (`manifest.json`,
+    /// `version.json`).
+    Marker,
+    /// Deployed file timestamps are not older than the release publication.
+    Mtime,
+}
+
+impl VersionSource {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            VersionSource::Hash => "hash",
+            VersionSource::Marker => "marker",
+            VersionSource::Mtime => "mtime",
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DetectedVersion {
+    pub version: String,
+    pub source: VersionSource,
+}
+
+/// Zip entries keep their build timestamp, which is a few minutes older than
+/// the GitHub publication time; six hours absorbs timezone/build slack while
+/// still separating consecutive releases that are days apart.
+const MTIME_TOLERANCE_HOURS: i64 = 6;
+
+/// Strip the tag prefix so `v2.7.0` and `2.7.0` compare equal.
+pub fn normalize_version(raw: &str) -> String {
+    raw.trim()
+        .trim_start_matches('v')
+        .trim_start_matches('V')
+        .to_string()
+}
+
+pub fn versions_equal(a: &str, b: &str) -> bool {
+    normalize_version(a).eq_ignore_ascii_case(&normalize_version(b))
+}
+
+/// True when `a` looks like a build ahead of `b` (development DLLs, manual
+/// master builds). Later segments decide; non-numeric segments compare as
+/// text and unparsable pairs never claim to be newer.
+pub fn is_newer(a: &str, b: &str) -> bool {
+    let split = |v: &str| -> Vec<String> {
+        normalize_version(v)
+            .split(['.', '-', '_'])
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect()
+    };
+    let (left, right) = (split(a), split(b));
+    let numeric = |v: &Vec<String>| v.first().and_then(|s| s.parse::<u64>().ok()).is_some();
+    if !numeric(&left) || !numeric(&right) {
+        return false;
+    }
+    for (l, r) in left.iter().zip(right.iter()) {
+        match (l.parse::<u64>(), r.parse::<u64>()) {
+            (Ok(ln), Ok(rn)) if ln != rn => return ln > rn,
+            (Ok(_), Ok(_)) => {}
+            _ => {
+                let (ll, rl) = (l.to_lowercase(), r.to_lowercase());
+                if ll != rl {
+                    return ll > rl;
+                }
+            }
+        }
+    }
+    left.len() > right.len()
+}
+
+fn tag_style(tag: &str, version: &str) -> String {
+    let bare = normalize_version(version);
+    if tag.trim_start().starts_with(['v', 'V']) {
+        format!("v{bare}")
+    } else {
+        bare
+    }
+}
+
+/// Every file the tool actually deployed, preferring the live copy but
+/// accepting the `.bak` twin so a disabled tool still reports its version.
+fn deployed_files(def: &ToolDef) -> Vec<PathBuf> {
+    let steam_root = paths::detect_steam_root().unwrap_or_default();
+    let Some(root) = def.root(&steam_root) else {
+        return Vec::new();
+    };
+
+    let mut out = Vec::new();
+    match def.target {
+        DeployTarget::SteamRoot { files } | DeployTarget::HomeShare { files, .. } => {
+            for rel in files {
+                let live = resolve_rel(&root, rel);
+                let candidate = if live.exists() {
+                    Some(live)
+                } else {
+                    let backup = PathBuf::from(format!("{}.bak", live.display()));
+                    backup.exists().then_some(backup)
+                };
+                if let Some(path) = candidate {
+                    collect_files(&path, &mut out);
+                }
+            }
+        }
+        DeployTarget::Plugins { .. } => {
+            let dir = root.join(def.id);
+            if dir.exists() {
+                collect_files(&dir, &mut out);
+            }
+        }
+        DeployTarget::Payload => {
+            let dir = payload_dir(def);
+            if dir.exists() {
+                collect_files(&dir, &mut out);
+            }
+        }
+    }
+    out
+}
+
+fn collect_files(path: &Path, out: &mut Vec<PathBuf>) {
+    if path.is_dir() {
+        if let Ok(entries) = std::fs::read_dir(path) {
+            for entry in entries.flatten() {
+                collect_files(&entry.path(), out);
+            }
+        }
+    } else if path.is_file() {
+        out.push(path.to_path_buf());
+    }
+}
+
+/// Files that carry the payload's own version number, most specific first.
+fn marker_files(def: &ToolDef) -> Vec<PathBuf> {
+    let steam_root = paths::detect_steam_root().unwrap_or_default();
+    let Some(root) = def.root(&steam_root) else {
+        return Vec::new();
+    };
+
+    match def.target {
+        DeployTarget::Plugins { .. } => vec![
+            root.join(def.id).join("manifest.json"),
+            root.join(def.id).join("version.json"),
+        ],
+        DeployTarget::Payload => vec![payload_dir(def).join("version.json")],
+        _ => vec![
+            root.join("lumaforge").join("version.json"),
+            root.join("lumaforge-version.json"),
+            root.join("ubuntu12_32").join("version.json"),
+            root.join("ubuntu12_32").join("lumaforge-version.json"),
+        ],
+    }
+}
+
+fn read_marker_version(path: &Path) -> Option<String> {
+    let raw = std::fs::read_to_string(path).ok()?;
+    let json: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    let version = json["version"].as_str()?.trim();
+    (!version.is_empty()).then(|| version.to_string())
+}
+
+fn newest_mtime(files: &[PathBuf]) -> Option<chrono::DateTime<chrono::Utc>> {
+    files
+        .iter()
+        .filter_map(|path| std::fs::metadata(path).ok()?.modified().ok())
+        .max()
+        .map(chrono::DateTime::<chrono::Utc>::from)
+}
+
+/// Establish which release is on disk, without downloading anything.
+///
+/// Layers, exact to heuristic:
+/// 1. SHA-256 of the deployed binary vs the release asset digest.
+/// 2. Version marker shipped with the payload.
+/// 3. Newest deployed file vs the release publication date.
+///
+/// Returns `None` when nothing conclusive was found, so the caller can fall
+/// back to `thirdparty-state.json`.
+pub fn detect_installed_version(
+    def: &ToolDef,
+    release: &github::ReleaseInfo,
+) -> Option<DetectedVersion> {
+    if tool_state(def) == ComponentState::Missing {
+        return None;
+    }
+
+    let files = deployed_files(def);
+
+    // 1. Exact: the asset *is* the deployed file (single-file releases such as
+    //    CloudRedirect's DLL/SO).
+    if let (Some(expected), "dll" | "so") = (
+        release.asset_digest.as_deref(),
+        release.archive_ext.as_str(),
+    ) {
+        let wanted = release.zip_name.to_lowercase();
+        for path in &files {
+            let name_matches = path
+                .file_name()
+                .map(|n| n.to_string_lossy().to_lowercase() == wanted)
+                .unwrap_or(false);
+            if !name_matches {
+                continue;
+            }
+            if let Some(size) = release.asset_size {
+                let local_size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+                if local_size != size {
+                    continue;
+                }
+            }
+            if github::sha256_file(path).as_deref() == Some(expected) {                return Some(DetectedVersion {
+                    version: release.tag_name.clone(),
+                    source: VersionSource::Hash,
+                });
+            }
+        }
+    }
+
+    // 2. The payload's own version marker.
+    for marker in marker_files(def) {
+        if let Some(version) = read_marker_version(&marker) {
+            return Some(DetectedVersion {
+                version: tag_style(&release.tag_name, &version),
+                source: VersionSource::Marker,
+            });
+        }
+    }
+
+    // 3. Timestamps: a copy extracted after the release was published is at
+    //    least that release.
+    if let (Some(published), Some(newest)) = (release.published_at, newest_mtime(&files)) {
+        if newest + chrono::Duration::hours(MTIME_TOLERANCE_HOURS) >= published {
+            return Some(DetectedVersion {
+                version: release.tag_name.clone(),
+                source: VersionSource::Mtime,
+            });
+        }
+    }
+
+    None
+}
+
+// ---------------------------------------------------------------------------
 // Rename .bak toggling
 // ---------------------------------------------------------------------------
 
@@ -994,5 +1245,35 @@ mod tests {
         }
 
         std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn versions_ignore_the_tag_prefix() {
+        assert!(versions_equal("v2.7.0", "2.7.0"));
+        assert!(!versions_equal("v2.6.7.0", "v2.6.7.1"));
+        assert_eq!(normalize_version(" V1.4.8.9 "), "1.4.8.9");
+    }
+
+    #[test]
+    fn compares_versions_numerically() {
+        assert!(is_newer("v1.4.8.9", "v1.4.8.6"));
+        assert!(is_newer("v0.4.7", "v0.4.6"));
+        assert!(!is_newer("v2.6.7.0", "v2.6.7.1"));
+        assert!(!is_newer("v2.7.0", "v2.7.0"));
+        assert!(!is_newer("detected", "v2.7.0"));
+    }
+
+    #[test]
+    fn reads_version_from_marker_json() {
+        let dir = scratch("version-marker");
+        let marker = dir.join("manifest.json");
+        std::fs::write(&marker, br#"{ "id": "steam-store-helper", "version": "2.7.0" }"#)
+            .unwrap();
+        assert_eq!(read_marker_version(&marker).as_deref(), Some("2.7.0"));
+
+        std::fs::write(&marker, br#"{ "id": "x" }"#).unwrap();
+        assert_eq!(read_marker_version(&marker), None);
+
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

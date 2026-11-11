@@ -22,6 +22,11 @@ pub struct ReleaseInfo {
     pub zip_name: String,
     /// "zip" | "dll" | "so" | "7z"
     pub archive_ext: String,
+    /// When GitHub published the release (used to date an install by mtime).
+    pub published_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// `sha256:<hex>` of the selected asset, when GitHub exposes it.
+    pub asset_digest: Option<String>,
+    pub asset_size: Option<u64>,
 }
 
 struct CachedRelease {
@@ -49,11 +54,19 @@ fn http_client() -> AnyResult<reqwest::blocking::Client> {
         .context("Failed to create HTTP client")
 }
 
+struct SelectedAsset {
+    name: String,
+    url: String,
+    ext: String,
+    digest: Option<String>,
+    size: Option<u64>,
+}
+
 fn select_asset(
     assets: &[serde_json::Value],
     preferred_asset: Option<&str>,
     preferred_asset_contains: Option<&str>,
-) -> AnyResult<(String, String, String)> {
+) -> AnyResult<SelectedAsset> {
     let contains_lower = preferred_asset_contains.map(|s| s.to_lowercase());
     let os_is_linux = cfg!(target_os = "linux");
 
@@ -124,7 +137,28 @@ fn select_asset(
     }
     .to_string();
 
-    Ok((name, url, ext))
+    let digest = chosen["digest"]
+        .as_str()
+        .map(normalize_digest)
+        .filter(|d| !d.is_empty());
+
+    Ok(SelectedAsset {
+        name,
+        url,
+        ext,
+        digest,
+        size: chosen["size"].as_u64(),
+    })
+}
+
+/// GitHub reports digests as `sha256:<hex>`; keep only the lowercase hex so it
+/// can be compared directly with a local hash.
+fn normalize_digest(raw: &str) -> String {
+    raw.rsplit(':')
+        .next()
+        .unwrap_or(raw)
+        .trim()
+        .to_lowercase()
 }
 
 /// Resolve the latest release for `owner/repo`, picking the asset that best
@@ -173,14 +207,21 @@ pub fn get_latest_github_release(
         .as_array()
         .context("Release has no assets")?;
 
-    let (zip_name, zip_url, archive_ext) =
-        select_asset(assets, preferred_asset, preferred_asset_contains)?;
+    let selected = select_asset(assets, preferred_asset, preferred_asset_contains)?;
+
+    let published_at = release["published_at"]
+        .as_str()
+        .and_then(|raw| chrono::DateTime::parse_from_rfc3339(raw).ok())
+        .map(|dt| dt.with_timezone(&chrono::Utc));
 
     let info = ReleaseInfo {
         tag_name,
-        zip_url,
-        zip_name,
-        archive_ext,
+        zip_url: selected.url,
+        zip_name: selected.name,
+        archive_ext: selected.ext,
+        published_at,
+        asset_digest: selected.digest,
+        asset_size: selected.size,
     };
 
     if let Ok(mut cache) = github_cache().lock() {
@@ -313,6 +354,16 @@ fn copy_dir_inner(
     Ok(())
 }
 
+/// Lowercase hex SHA-256 of a file, used to match a deployed binary against
+/// the digest GitHub publishes for its release asset.
+pub fn sha256_file(path: &Path) -> Option<String> {
+    use sha2::{Digest, Sha256};
+    let mut file = std::fs::File::open(path).ok()?;
+    let mut hasher = Sha256::new();
+    std::io::copy(&mut file, &mut hasher).ok()?;
+    Some(format!("{:x}", hasher.finalize()))
+}
+
 pub fn is_dir_populated(dir: &Path) -> bool {
     dir.is_dir()
         && std::fs::read_dir(dir)
@@ -321,8 +372,7 @@ pub fn is_dir_populated(dir: &Path) -> bool {
             .is_some()
 }
 
-pub fn remove_dir_recursive(dir: &Path) -> Result<(), String> {
-    if dir.is_dir() {
+pub fn remove_dir_recursive(dir: &Path) -> Result<(), String> {    if dir.is_dir() {
         for entry in std::fs::read_dir(dir).map_err(|e| e.to_string())? {
             let entry = entry.map_err(|e| e.to_string())?;
             let path = entry.path();
@@ -335,5 +385,36 @@ pub fn remove_dir_recursive(dir: &Path) -> Result<(), String> {
         std::fs::remove_dir(dir).map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn strips_the_digest_algorithm_prefix() {
+        assert_eq!(
+            normalize_digest("sha256:D71C1C22A7D83BDD0F43371C9D28CE7B7BFC09BC3BEB0074531EE1DE79DAC32A"),
+            "d71c1c22a7d83bdd0f43371c9d28ce7b7bfc09bc3beb0074531ee1de79dac32a"
+        );
+        assert_eq!(normalize_digest("abcdef"), "abcdef");
+    }
+
+    #[test]
+    fn hashes_a_file_like_github_reports_it() {
+        let dir = std::env::temp_dir().join("lumaforge-panel-sha256");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("blob.bin");
+        std::fs::write(&file, b"abc").unwrap();
+
+        // Well-known SHA-256 of "abc".
+        assert_eq!(
+            sha256_file(&file).as_deref(),
+            Some("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad")
+        );
+
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 }
 

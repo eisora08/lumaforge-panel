@@ -24,6 +24,8 @@ export interface ToolStatus {
   latestVersion: string | null;
   updateAvailable: boolean;
   releaseAvailable: boolean;
+  /** `hash` | `marker` | `mtime` when read from disk, `null` when from state. */
+  versionDetected: string | null;
   deployPath: string | null;
 }
 

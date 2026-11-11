@@ -518,8 +518,17 @@ export function DashboardView() {
                   ) : (
                     <span className="panel-component-version">
                       {tool.installed && tool.installedVersion
-                        ? `v${tool.installedVersion}`
+                        ? `v${tool.installedVersion.replace(/^v/i, '')}`
                         : ''}
+                    </span>
+                  )}
+
+                  {tool.installed && tool.versionDetected && !tool.updateAvailable && (
+                    <span
+                      className="panel-component-detected"
+                      title={t('tool.detectedTitle')}
+                    >
+                      {t('tool.detected')}
                     </span>
                   )}
 

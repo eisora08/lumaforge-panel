@@ -75,6 +75,22 @@ pub fn set_enabled(tool_id: &str, enabled: bool) -> Result<(), String> {
     save_state(&state)
 }
 
+/// Set only the version for `tool_id`, keeping `installed_at`/`enabled` — used
+/// when the version was detected on disk instead of installed by the app.
+pub fn set_version(tool_id: &str, version: &str) -> Result<(), String> {
+    let mut state = load_state();
+    let entry = state
+        .tools
+        .entry(tool_id.to_string())
+        .or_insert_with(|| ToolStateEntry {
+            version: version.to_string(),
+            installed_at: now_iso(),
+            enabled: true,
+        });
+    entry.version = version.to_string();
+    save_state(&state)
+}
+
 /// Drop the entry for `tool_id` entirely (uninstall), keeping the rest.
 pub fn remove_tool(tool_id: &str) -> Result<(), String> {
     let mut state = load_state();

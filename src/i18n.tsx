@@ -22,6 +22,8 @@ const EN: Record<string, string> = {
   'ui.working': 'WORKING...',
   'ui.done': 'DONE',
   'ui.refresh': 'Refresh',
+  'tool.detected': 'detected',
+  'tool.detectedTitle': 'Version read from the files on disk',
 
   // window / titlebar
   'app.updatesBadge': '{n} updates available',
@@ -217,6 +219,8 @@ const ES: Record<string, string> = {
   'ui.working': 'PROCESANDO...',
   'ui.done': 'LISTO',
   'ui.refresh': 'Actualizar',
+  'tool.detected': 'detectado',
+  'tool.detectedTitle': 'Versión leída de los archivos en disco',
 
   'app.updatesBadge': '{n} actualizaciones disponibles',
   'app.openDataFolder': 'Abrir carpeta de datos de LumaForge',
